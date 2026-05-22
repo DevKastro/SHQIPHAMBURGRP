@@ -1,117 +1,49 @@
+import { Events, PermissionFlagsBits } from "discord.js";
+import { logger } from "../utils/logger.js";
 
-
-
-
-
-import { Events } from 'discord.js';
-import { logger } from '../utils/logger.js';
-import { getLevelingConfig, getUserLevelData } from '../services/leveling.js';
-import { addXp } from '../services/xpSystem.js';
-import { checkRateLimit } from '../utils/rateLimiter.js';
-
-const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
-const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
+// Lista e fjalëve të ndaluara nga fotoja jote (Wildcard mode)
+const fjaleTeNdaluara = [
+  "ti qi ropt", "ta qij nanen", "ta qij motren", "ti qi dekt",
+  "o kar", "kar", "vrk", "mam qim", "dek qim", "qifje",
+  "qi robt", "qi nanen", "qi motren", "qrobt", "qnane", "qmotr",
+  "rrotkari", "rrotk", "karuc", "karuc i mutit", "mutac",
+  "mutav", "bythqir", "pidhrob", "pidhsome"
+];
 
 export default {
   name: Events.MessageCreate,
-  async execute(message, client) {
+  once: false,
+
+  async execute(message) {
     try {
-      
+      // Shpërfillim mesazhet e botëve ose nëse mesazhi nuk është në server
       if (message.author.bot || !message.guild) return;
 
-      await handleLeveling(message, client);
-    } catch (error) {
-      logger.error('Error in messageCreate event:', error);
-    }
-  }
-};
+      // Shpërfillim stafin (Administratorët dhe Moderatorët nuk pësojnë timeout)
+      if (message.member.permissions.has(PermissionFlagsBits.Administrator) || message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) return;
 
+      // Kthejmë tekstin në shkronja të vogla për të kapur fjalën kudo në fjali
+      const mesazhiUlet = message.content.toLowerCase();
 
+      // Kontrollojmë nëse mesazhi përmban ndonjë nga fjalët e ndaluara
+      const kaFjaleTeNdaluar = fjaleTeNdaluara.some(fjala => mesazhiUlet.includes(fjala));
 
+      if (kaFjaleTeNdaluar) {
+        // 1. Fshijmë mesazhin e pistë menjëherë
+        await message.delete().catch(() => null);
 
+        // 2. I japim Timeout (Mute) për 5 minuta
+        const kohaTimeout = 5 * 60 * 1000; 
+        await message.member.timeout(kohaTimeout, "Përdorim i fjalëve të ndaluara (AutoMod)").catch(err => {
+            logger.error(`Nuk i dhashë dot timeout lojtarit ${message.author.tag}:`, err);
+        });
 
-
-
-
-async function handleLeveling(message, client) {
-  try {
-    const rateLimitKey = `xp-event:${message.guild.id}:${message.author.id}`;
-    const canProcess = await checkRateLimit(rateLimitKey, MESSAGE_XP_RATE_LIMIT_ATTEMPTS, MESSAGE_XP_RATE_LIMIT_WINDOW_MS);
-    if (!canProcess) {
-      return;
-    }
-
-    const levelingConfig = await getLevelingConfig(client, message.guild.id);
-    
-    if (!levelingConfig?.enabled) {
-      return;
-    }
-
-    
-    if (levelingConfig.ignoredChannels?.includes(message.channel.id)) {
-      return;
-    }
-
-    
-    if (levelingConfig.ignoredRoles?.length > 0) {
-      const member = await message.guild.members.fetch(message.author.id).catch(() => {
-        return null;
-      });
-      if (member && member.roles.cache.some(role => levelingConfig.ignoredRoles.includes(role.id))) {
-        return;
+        // 3. Dërgojmë një paralajmërim në kanal që zhduket pas 5 sekondave
+        const paralajmerim = await message.channel.send(`⚠️ ${message.author}, u dënove me **5 minuta Timeout** sepse përdore fjalë të ndaluara!`);
+        setTimeout(() => paralajmerim.delete().catch(() => null), 5000);
       }
+    } catch (error) {
+      logger.error("Gabim në eventin messageCreate (AutoMod):", error);
     }
-
-    
-    if (levelingConfig.blacklistedUsers?.includes(message.author.id)) {
-      return;
-    }
-
-    
-    if (!message.content || message.content.trim().length === 0) {
-      return;
-    }
-
-    const userData = await getUserLevelData(client, message.guild.id, message.author.id);
-    
-    
-    const cooldownTime = levelingConfig.xpCooldown || 60;
-    const now = Date.now();
-    const timeSinceLastMessage = now - (userData.lastMessage || 0);
-    
-    
-    if (timeSinceLastMessage < cooldownTime * 1000) {
-      return;
-    }
-
-    
-    const minXP = levelingConfig.xpRange?.min || levelingConfig.xpPerMessage?.min || 15;
-    const maxXP = levelingConfig.xpRange?.max || levelingConfig.xpPerMessage?.max || 25;
-
-    
-    const safeMinXP = Math.max(1, minXP);
-    const safeMaxXP = Math.max(safeMinXP, maxXP);
-
-    
-    const xpToGive = Math.floor(Math.random() * (safeMaxXP - safeMinXP + 1)) + safeMinXP;
-
-    
-    let finalXP = xpToGive;
-    if (levelingConfig.xpMultiplier && levelingConfig.xpMultiplier > 1) {
-      finalXP = Math.floor(finalXP * levelingConfig.xpMultiplier);
-    }
-
-    
-    const result = await addXp(client, message.guild, message.member, finalXP);
-    
-    if (result.success && result.leveledUp) {
-      logger.info(
-        `${message.author.tag} leveled up to level ${result.level} in ${message.guild.name}`
-      );
-    }
-  } catch (error) {
-    logger.error('Error handling leveling for message:', error);
-  }
-}
-
-
+  },
+};
