@@ -1,4 +1,4 @@
-import { Events, ChannelType, PermissionFlagsBits } from "discord.js";
+import { Events, ChannelType } from "discord.js";
 import { logger, startupLog } from "../utils/logger.js";
 import config from "../config/application.js";
 import { reconcileReactionRoleMessages } from "../services/reactionRoleService.js";
@@ -20,38 +20,39 @@ export default {
         `Reaction role reconciliation: scanned ${reconciliationSummary.scannedMessages}, removed ${reconciliationSummary.removedMessages}, errors ${reconciliationSummary.errors}`
       );
 
-      // --- SISTEMI AUTOMATIK ÇDO 5 MINUTA ---
-      startupLog("Sistemi i njoftimeve automatike çdo 5 minuta u aktivizua!");
+      // --- SISTEMI AUTOMATIK ÇDO 15 MINUTA KE KANALET E CAKTUARA (NË HESHTJE) ---
+      startupLog("Sistemi i njoftimeve automatike çdo 15 minuta u aktivizua!");
       
-      setInterval(async () => {
+      const kanaletELejuara = ["メdiskutime", "メscreenshot", "メcasino", "🔵┃18tg-chat"];
+
+      if (global.njoftimInterval) clearInterval(global.njoftimInterval);
+
+      // 900000 milisekonda = 15 minuta
+      global.njoftimInterval = setInterval(async () => {
         const guilds = client.guilds.cache;
 
         for (const [guildId, guild] of guilds) {
           const channels = guild.channels.cache;
 
           for (const [channelId, channel] of channels) {
-            // Kontrollon nëse është kanal teksti publik ku boti ka leje të shkruajë
-            if (
-              channel.type === ChannelType.GuildText && 
-              channel.viewable && 
-              channel.permissionsFor(guild.members.me).has(PermissionFlagsBits.SendMessages)
-            ) {
+            if (channel.type === ChannelType.GuildText && kanaletELejuara.includes(channel.name)) {
               try {
-                await channel.send('⚠️ **KUJDES:** MOS SHANI DHE LEXONI RREGULLAT! 📜');
+                // Shtojmë "flags: [4096]" (Suppressed Notifications) që mesazhi të shkojë krejtësisht në heshtje [1]
+                await channel.send({ 
+                  content: '⚠️ **KUJDES:** MOS SHANI DHE LEXONI RREGULLAT! 📜',
+                  flags: [4096] // Ky flag bën që mesazhi të shkojë pa njoftim (Silent Message) [1]
+                });
               } catch (err) {
                 logger.error(`Gabim gjatë dërgimit automatik në ${channel.name}:`, err);
               }
             }
           }
         }
-      }, 300000); // 300,000 milisekonda = 5 minuta
-      // ----------------------------------------
+      }, 900000); 
+      // -------------------------------------------------------------
 
     } catch (error) {
       logger.error("Error in ready event:", error);
     }
   },
 };
-
-
-
