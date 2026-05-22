@@ -22,7 +22,7 @@ export default {
 **6. 🎭 Vlerësoni Jetën (Value Your Life):** Binduni kur ju drejtohet arma, mos bëni si superhero.
             `)
             // KETU VENDOS LINKUN E FOTOS QE DESHIRON TE SHFAQET POSHTE TEKSTIT (FIKS SI NE FOTO)
-            .setImage('https://cdn.discordapp.com/attachments/1350496684634804294/1507445149817372672/IMG_6063.png?ex=6a11ed32&is=6a109bb2&hm=afaa366db7d542f5551658e1ac33754992f7d05cd3cc9c755fd64791b2b77f02&'); 
+            .setImage('https://cdn.discordapp.com/attachments/1505541133458083910/1507449358444921013/Screenshot_2026-05-22_201931.PNG?ex=6a11f11e&is=6a109f9e&hm=86959afc6f20baf2661ae64debf927d5f136610eb0c79252e5b811fe99f3a470&'); 
 
         // Boti i pergjigjet lojtarit duke derguar kutine e dizajnuar
         await interaction.reply({ embeds: [rulesEmbed] });
