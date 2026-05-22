@@ -1,6 +1,6 @@
-const { SlashCommandBuilder } = require('discord.js');
+import { SlashCommandBuilder } from 'discord.js';
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName('rregullat')
         .setDescription('Shfaq rregullat zyrtare te Roleplay ne server'),
@@ -12,7 +12,7 @@ module.exports = {
 3. 🧠 **Metagaming:** Ndalohet përdorimi i informacioneve jashtë loje (Discord, Streams) brenda në lojë.
 4. 💪 **Powergaming:** Ndalohet kryerja e veprimeve jorealiste (p.sh. të flasësh kur je pa ndjenja).
 5. 🛑 **Combat Logging:** Ndalohet dalja nga loja (Alt+F4) në mes të aksionit apo ndjekjes nga policia.
-6. 🎭 **Vlerësoni Jetën (Value Your Life):** Duhet të keni frikë për jetën në lojë. Nëse ju drejtohet arma, binduni!`;
+6. 🎭 **Vlerësoni Jetën (Value Your Life):** Ndajeni mendjen, nëse ju drejtohet arma, duhet të bindeni!`;
 
         await interaction.reply({ content: rulesMessage });
     },
