@@ -7,7 +7,7 @@ export default {
     async execute(interaction) {
         // Krijojme kutine Embed
         const rulesEmbed = new EmbedBuilder()
-            .setColor('#7289da') // Ngjyra anesore e kutise (mund ta ndryshosh sipas qejfit)
+            .setColor('#ff0000') // Ngjyra anesore e kutise (mund ta ndryshosh sipas qejfit)
             .setTitle('📜 RREGULLAT ZYRTARE TË ROLEPLAY (RP)')
             .setAuthor({ 
                 name: 'Kastro', 
