@@ -20,14 +20,15 @@ export default {
         `Reaction role reconciliation: scanned ${reconciliationSummary.scannedMessages}, removed ${reconciliationSummary.removedMessages}, errors ${reconciliationSummary.errors}`
       );
 
-      // --- SISTEMI AUTOMATIK ÇDO 15 MINUTA KE KANALET E CAKTUARA (NË HESHTJE) ---
-      startupLog("Sistemi i njoftimeve automatike çdo 15 minuta u aktivizua!");
+      // --- SISTEMI AUTOMATIK ÇDO 1 ORË KE KANALET E CAKTUARA (NË HESHTJE) ---
+      startupLog("Sistemi i njoftimeve automatike çdo 1 orë u aktivizua!");
       
       const kanaletELejuara = ["メdiskutime", "メscreenshot", "メcasino", "🔵┃18tg-chat"];
 
+      // Parandalon dërgimin e dyfishtë nëse boti rindizet shpejt
       if (global.njoftimInterval) clearInterval(global.njoftimInterval);
 
-      // 900000 milisekonda = 15 minuta
+      // 3600000 milisekonda = saktësisht 1 orë
       global.njoftimInterval = setInterval(async () => {
         const guilds = client.guilds.cache;
 
@@ -37,10 +38,10 @@ export default {
           for (const [channelId, channel] of channels) {
             if (channel.type === ChannelType.GuildText && kanaletELejuara.includes(channel.name)) {
               try {
-                // Shtojmë "flags: [4096]" (Suppressed Notifications) që mesazhi të shkojë krejtësisht në heshtje [1]
+                // Dërgon mesazhin në heshtje që të mos bëjë njoftim (Silent Message)
                 await channel.send({ 
                   content: '⚠️ **KUJDES:** MOS SHANI DHE LEXONI RREGULLAT! 📜',
-                  flags: [4096] // Ky flag bën që mesazhi të shkojë pa njoftim (Silent Message) [1]
+                  flags: [4096] 
                 });
               } catch (err) {
                 logger.error(`Gabim gjatë dërgimit automatik në ${channel.name}:`, err);
@@ -48,7 +49,7 @@ export default {
             }
           }
         }
-      }, 1,800,000); 
+      }, 3600000); 
       // -------------------------------------------------------------
 
     } catch (error) {
