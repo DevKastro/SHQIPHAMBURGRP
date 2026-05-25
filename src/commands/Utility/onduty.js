@@ -3,26 +3,38 @@ import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 export default {
   data: new SlashCommandBuilder()
     .setName("onduty")
-    .setDescription("Shfaq kohen totale te qendrimit te stafit ne call"),
+    .setDescription("Shfaq kohën totale të qëndrimit të stafit në call"),
   async execute(interaction) {
     const embed = new EmbedBuilder()
       .setColor("#00ffcc")
-      .setTitle("📊 RAPORTI I KOHËS SË STAFF-IT NË CALL")
+      .setTitle("📊 RAPORTI I SAKTË I KOHËS SË STAFF-IT NË CALL")
       .setTimestamp();
 
     let listaTekst = "";
     const kohaTani = Math.floor(Date.now() / 1000);
+    const dbQuery = interaction.client.db?.query || interaction.client.db?.db?.query;
 
-    // Krijojmë një listë me të gjithë përdoruesit që kanë qenë në detyrë
+    const dbData = new Map();
+
+    if (dbQuery) {
+      await dbQuery(`CREATE TABLE IF NOT EXISTS staff_duty (user_id TEXT PRIMARY KEY, total_time BIGINT)`).catch(() => null);
+      const rezultati = await dbQuery(`SELECT * FROM staff_duty`).catch(() => null);
+      if (rezultati && rezultati.rows) {
+        for (const row of rezultati.rows) {
+          dbData.set(row.user_id, parseInt(row.total_time));
+        }
+      }
+    }
+
     const gjitheUserat = new Set([
+      ...dbData.keys(),
       ...(global.staffBackupTime ? global.staffBackupTime.keys() : []),
       ...(global.staffDutyStart ? global.staffDutyStart.keys() : [])
     ]);
 
     for (const userId of gjitheUserat) {
-      let sekondaTotale = global.staffBackupTime.get(userId) || 0;
+      let sekondaTotale = (dbData.get(userId) || 0) + (global.staffBackupTime?.get(userId) || 0);
 
-      // Nëse lojtari është LIVE në kanal aktualisht, shtojmë edhe sekondat live tani
       if (global.staffDutyStart && global.staffDutyStart.has(userId)) {
         const kohaFillimit = global.staffDutyStart.get(userId);
         sekondaTotale += (kohaTani - kohaFillimit);
@@ -37,7 +49,7 @@ export default {
       }
     }
 
-    embed.setDescription(listaTekst || "ℹ️ Nuk ka asnje staf aktualisht ne kanal dhe asnje te dhene te mbledhur.");
+    embed.setDescription(listaTekst || "ℹ️ Nuk ka asnjë të dhënë të mbledhur për stafin në këtë moment.");
     await interaction.reply({ embeds: [embed] });
   },
 };
