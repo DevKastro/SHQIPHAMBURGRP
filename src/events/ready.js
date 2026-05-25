@@ -1,4 +1,4 @@
-import { Events, ChannelType } from "discord.js";
+import { Events, ChannelType, MessageFlags } from "discord.js";
 import { logger, startupLog } from "../utils/logger.js";
 import config from "../config/application.js";
 import { reconcileReactionRoleMessages } from "../services/reactionRoleService.js";
@@ -20,25 +20,6 @@ export default {
         `Reaction role reconciliation: scanned ${reconciliationSummary.scannedMessages}, removed ${reconciliationSummary.removedMessages}, errors ${reconciliationSummary.errors}`
       );
 
-      // ------------------------------------------------------------------
-      // 🔥 FORCED REGISTRATION: DETYROJMË KOMANDAT TË SHKOJNË NË 2 SERVERAT E MI
-      // ------------------------------------------------------------------
-      try {
-        const serveratEmi = ["1505536422013304852", "1496144652938772500"];
-        const commandsData = Array.from(client.commands.values()).map(cmd => cmd.data.toJSON());
-
-        for (const guildId of serveratEmi) {
-          await client.rest.put(
-            `/applications/${client.user.id}/guilds/${guildId}/commands`,
-            { body: commandsData }
-          );
-          startupLog(`[Auto-Deploy]: ✅ Komandat u detyruan të shkojnë në serverin: ${guildId}`);
-        }
-      } catch (deployError) {
-        logger.error("[Auto-Deploy Error]: Nuk i regjistrova dot komandat:", deployError);
-      }
-      // ------------------------------------------------------------------
-
       // --- SISTEMI AUTOMATIK ÇDO 15 MINUTA KE KANALET E CAKTUARA (NË HESHTJE) ---
       startupLog("Sistemi i njoftimeve automatike çdo 15 minuta u aktivizua!");
       const kanaletELejuara = ["メdiskutime", "メscreenshot", "メcasino", "🔵┃18tg-chat"];
@@ -54,7 +35,7 @@ export default {
               try {
                 await channel.send({ 
                   content: '⚠️ **KUJDES:** MOS SHANI DHE LEXONI RREGULLAT! 📜',
-                  flags: [4096]
+                  flags: [MessageFlags.Silent]
                 });
               } catch (err) {
                 logger.error(`Gabim gjatë dërgimit automatik në ${channel.name}:`, err);
@@ -62,7 +43,7 @@ export default {
             }
           }
         }
-      }, 900000); 
+      }, 900000); // 15 minuta
       // -------------------------------------------------------------
 
     } catch (error) {
@@ -70,3 +51,4 @@ export default {
     }
   },
 };
+
