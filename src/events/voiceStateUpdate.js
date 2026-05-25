@@ -2,11 +2,6 @@ import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import { getJoinToCreateConfig, registerTemporaryChannel, unregisterTemporaryChannel, getTemporaryChannelInfo, formatChannelName } from '../utils/database.js';
 import { sanitizeInput } from '../utils/sanitization.js';
 import { logger } from '../utils/logger.js';
-import pg from 'pg';
-
-// Lidhja direkte me PostgreSQL duke përdorur variablën e Railway
-const pgClient = new pg.Client({ connectionString: process.env.DATABASE_URL });
-pgClient.connect().catch(() => null);
 
 if (!global.staffDutyStart) global.staffDutyStart = new Map();
 if (!global.staffBackupTime) global.staffBackupTime = new Map();
@@ -45,16 +40,18 @@ export default {
                         const sekondatKaluar = kohaTani - kohaFillimit;
 
                         if (sekondatKaluar > 0) {
-                            // Ruajtja e pavarur në Postgres
-                            if (pgClient.link !== false) {
-                                await pgClient.query(`CREATE TABLE IF NOT EXISTS staff_duty (user_id TEXT PRIMARY KEY, total_time BIGINT)`).catch(() => null);
-                                await pgClient.query(
+                            // Përdorim sistemin e saktë të databazës ekzistuese të botit tënd
+                            const dbQuery = client.db?.query || (client.db?.db ? (client.db.db.query ? client.db.db.query : null) : null);
+                            if (dbQuery) {
+                                await dbQuery(`CREATE TABLE IF NOT EXISTS staff_duty (user_id TEXT PRIMARY KEY, total_time BIGINT)`).catch(() => null);
+                                await dbQuery(
                                     `INSERT INTO staff_duty (user_id, total_time) VALUES ($1, $2) 
                                      ON CONFLICT (user_id) DO UPDATE SET total_time = staff_duty.total_time + $2`,
                                     [userId, sekondatKaluar]
                                 ).catch(() => null);
                             }
-                            // Rezervë në memorie nëse ka vonesë në DB
+                            
+                            // Ruajtja rezervë në memorie nëse boti nuk është lidhur ende me DB
                             const kohaAktuale = global.staffBackupTime.get(userId) || 0;
                             global.staffBackupTime.set(userId, kohaAktuale + sekondatKaluar);
                         }
