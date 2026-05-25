@@ -80,9 +80,25 @@ class TitanBot extends Client {
       await this.loadHandlers();
       startupLog('Handlers loaded');
       
-      startupLog('Logging into Discord...');
+           startupLog('Logging into Discord...');
       await this.login(this.config.bot.token);
       startupLog('Discord login successful');
+
+      try {
+        const serveratEmi = ["1505536422013304852", "1496144652938772500"];
+        const commandsData = Array.from(this.commands.values()).map(cmd => cmd.data.toJSON());
+
+        for (const guildId of serveratEmi) {
+          await this.rest.put(
+            `/applications/${this.user.id}/guilds/${guildId}/commands`,
+            { body: commandsData }
+          );
+          startupLog(`[DETYRIM]: ✅ Komandat u regjistruan me sukses në serverin: ${guildId}`);
+        }
+      } catch (deployError) {
+        startupLog(`❌ Gabim i rëndë gjatë regjistrimit të detyruar: ${deployError}`);
+      }
+
       
       startupLog('Registering slash commands...');
       await this.registerCommands();
