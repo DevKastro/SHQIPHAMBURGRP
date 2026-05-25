@@ -11,7 +11,7 @@ export default {
     const linkGrp = 'https://www.roblox.com/share/g/35906050';
     
     // ID e rolit të Qytetarëve për t'i bërë tag automatik
-    const ID_ROL_QYTETARET = "1489919705983746189";
+    const ID_ROL_QYTETARET = "**1489919705983746189**";
 
     const embed = new EmbedBuilder()
       .setColor('#ff0000') // Ngjyra e Kuqe zyrtare e Shqiphamburg RP
