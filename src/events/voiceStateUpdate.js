@@ -1,13 +1,12 @@
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
-import {
-    getJoinToCreateConfig, 
-    registerTemporaryChannel, 
-    unregisterTemporaryChannel,
-    getTemporaryChannelInfo,
-    formatChannelName
-} from '../utils/database.js';
+import { getJoinToCreateConfig, registerTemporaryChannel, unregisterTemporaryChannel, getTemporaryChannelInfo, formatChannelName } from '../utils/database.js';
 import { sanitizeInput } from '../utils/sanitization.js';
 import { logger } from '../utils/logger.js';
+import pg from 'pg';
+
+// Lidhja direkte me PostgreSQL duke përdorur variablën e Railway
+const pgClient = new pg.Client({ connectionString: process.env.DATABASE_URL });
+pgClient.connect().catch(() => null);
 
 if (!global.staffDutyStart) global.staffDutyStart = new Map();
 if (!global.staffBackupTime) global.staffBackupTime = new Map();
@@ -22,23 +21,21 @@ export default {
         const cooldownKey = `${guildId}-${userId}`;
         cleanupCooldownEntries();
 
-        // --- SISTEMI AUTOMATIK PËR TË GJITHË STAFIN ---
         try {
             const ID_KANALI_ZE_SPECIFIK = "1500903502501773373";
-            const ID_ROL_STAFF_KRYESOR = "1435751640346132570"; // Roli që duhet të kenë që t'u numërohet koha
-            const ID_ROL_STAFF_DUTY = "1500883679046664273"; // Roli i detyrës që u jepet automatikisht
+            const ID_ROL_STAFF_KRYESOR = "1435751640346132570";
+            const ID_ROL_STAFF_DUTY = "1500883679046664273";
 
-            // Kontrollojmë nëse lojtari ka rolin e stafit kryesor
             const eshteStaf = newState.member?.roles.cache.has(ID_ROL_STAFF_KRYESOR) || oldState.member?.roles.cache.has(ID_ROL_STAFF_KRYESOR);
 
             if (eshteStaf) {
-                // 1. Kur një anëtar stafi futet në kanal
+                // 1. Kur stafi futet në kanal (Jep rolin menjëherë)
                 if (newState.channelId === ID_KANALI_ZE_SPECIFIK && oldState.channelId !== ID_KANALI_ZE_SPECIFIK) {
                     await newState.member.roles.add(ID_ROL_STAFF_DUTY).catch(() => null);
                     global.staffDutyStart.set(userId, Math.floor(Date.now() / 1000));
                 }
 
-                // 2. Kur një anëtar stafi del nga kanali
+                // 2. Kur stafi del nga kanali
                 if (oldState.channelId === ID_KANALI_ZE_SPECIFIK && newState.channelId !== ID_KANALI_ZE_SPECIFIK) {
                     await newState.member.roles.remove(ID_ROL_STAFF_DUTY).catch(() => null);
                     
@@ -48,15 +45,16 @@ export default {
                         const sekondatKaluar = kohaTani - kohaFillimit;
 
                         if (sekondatKaluar > 0) {
-                            const dbQuery = client.db?.query || client.db?.db?.query;
-                            if (dbQuery) {
-                                await dbQuery(
+                            // Ruajtja e pavarur në Postgres
+                            if (pgClient.link !== false) {
+                                await pgClient.query(`CREATE TABLE IF NOT EXISTS staff_duty (user_id TEXT PRIMARY KEY, total_time BIGINT)`).catch(() => null);
+                                await pgClient.query(
                                     `INSERT INTO staff_duty (user_id, total_time) VALUES ($1, $2) 
                                      ON CONFLICT (user_id) DO UPDATE SET total_time = staff_duty.total_time + $2`,
                                     [userId, sekondatKaluar]
                                 ).catch(() => null);
                             }
-                            
+                            // Rezervë në memorie nëse ka vonesë në DB
                             const kohaAktuale = global.staffBackupTime.get(userId) || 0;
                             global.staffBackupTime.set(userId, kohaAktuale + sekondatKaluar);
                         }
@@ -64,9 +62,7 @@ export default {
                     }
                 }
             }
-        } catch (staffError) {
-            logger.error(staffError);
-        }
+        } catch (staffError) { logger.error(staffError); }
 
         try {
             const config = await getJoinToCreateConfig(client, guildId);
