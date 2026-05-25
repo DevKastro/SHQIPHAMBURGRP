@@ -18,15 +18,47 @@ const MAX_CHANNEL_NAME_LENGTH = 100;
 const FALLBACK_CHANNEL_NAME = 'Voice Room';
 const MAX_TRACKED_COOLDOWNS = 10000;
 
+// --- STRUKTURAT E MEMORIES PËR STAFF DUTY ---
+if (!global.staffDutyStart) global.staffDutyStart = new Map();
+if (!global.staffTotalTime) global.staffTotalTime = new Map();
+
 export default {
     name: 'voiceStateUpdate',
     async execute(oldState, newState, client) {
-        if (newState.member.user.bot) return;
+        if (newState.member?.user?.bot) return;
 
         const guildId = newState.guild.id;
         const userId = newState.member.id;
         const cooldownKey = `${guildId}-${userId}`;
         cleanupCooldownEntries();
+
+        // --- LOGJIKA AUTOMATIKE PËR STAFF DUTY (ID TË SHKRUARA DIREKT) ---
+        try {
+            const ID_KANALI_ZE_SPECIFIK = "1500903502501773373";
+            const ID_ROL_STAFF = "1500883679046664273";
+
+            // 1. Stafi futet në kanalin e caktuar të zërit
+            if (newState.channelId === ID_KANALI_ZE_SPECIFIK && oldState.channelId !== ID_KANALI_ZE_SPECIFIK) {
+                await newState.member.roles.add(ID_ROL_STAFF).catch(err => logger.error(`Gabim gjatë dhënies së rolit: ${err}`));
+                global.staffDutyStart.set(userId, Date.now());
+            }
+
+            // 2. Stafi del nga kanali i caktuar i zërit
+            if (oldState.channelId === ID_KANALI_ZE_SPECIFIK && newState.channelId !== ID_KANALI_ZE_SPECIFIK) {
+                await newState.member.roles.remove(ID_ROL_STAFF).catch(err => logger.error(`Gabim gjatë heqjes së rolit: ${err}`));
+                
+                const kohaFillimit = global.staffDutyStart.get(userId);
+                if (kohaFillimit) {
+                    const kohaKaluar = Date.now() - kohaFillimit;
+                    const kohaEVjetër = global.staffTotalTime.get(userId) || 0;
+                    global.staffTotalTime.set(userId, kohaEVjetër + kohaKaluar);
+                    global.staffDutyStart.delete(userId);
+                }
+            }
+        } catch (staffError) {
+            logger.error(`Gabim në llogaritjen e kohës së stafit:`, staffError);
+        }
+        // --------------------------------------------------------
 
         try {
             const config = await getJoinToCreateConfig(client, guildId);
@@ -61,7 +93,7 @@ export default {
             const now = Date.now();
             if (channelCreationCooldown.has(cooldownKey)) {
                 const lastCreation = channelCreationCooldown.get(cooldownKey);
-if (now - lastCreation < VOICE_CREATE_COOLDOWN_MS) {
+                if (now - lastCreation < VOICE_CREATE_COOLDOWN_MS) {
                     logger.warn(`User ${member.id} is on cooldown for channel creation`);
                     return;
                 }
@@ -181,9 +213,9 @@ if (now - lastCreation < VOICE_CREATE_COOLDOWN_MS) {
 
                 const tempChannel = await guild.channels.create({
                     name: channelName,
-type: ChannelType.GuildVoice,
+                    type: ChannelType.GuildVoice,
                     parent: triggerChannel.parentId,
-userLimit: userLimit === 0 ? undefined : userLimit,
+                    userLimit: userLimit === 0 ? undefined : userLimit,
                     bitrate: bitrate,
                     permissionOverwrites: [
                         {
@@ -195,119 +227,3 @@ userLimit: userLimit === 0 ? undefined : userLimit,
                             allow: ['Connect', 'Speak']
                         }
                     ]
-                });
-
-                await registerTemporaryChannel(client, guild.id, tempChannel.id, member.id, triggerChannel.id);
-
-                if (member.voice?.channel?.id === triggerChannel.id) {
-                    await member.voice.setChannel(tempChannel);
-                } else {
-                    logger.debug(`Skipped moving ${member.id} to temporary channel ${tempChannel.id} because voice state changed`);
-                }
-
-                logger.info(`Created temporary voice channel ${tempChannel.name} (${tempChannel.id}) for user ${member.user.tag} in guild ${guild.name} with user limit ${userLimit}`);
-
-            } catch (error) {
-                logger.error(`Failed to create temporary channel for user ${member.user.tag} in guild ${guild.name}:`, error);
-                
-                channelCreationCooldown.delete(cooldownKey);
-                
-                try {
-                    await member.send({
-                        content: `❌ Failed to create your temporary voice channel. Please contact a server administrator.`
-                    });
-                } catch (dmError) {
-                    logger.debug(`Unable to send temporary channel failure DM to user ${member.id}:`, dmError);
-                }
-            }
-        }
-
-        async function deleteTemporaryChannel(client, channel, guildId) {
-            try {
-                await unregisterTemporaryChannel(client, guildId, channel.id);
-
-                await channel.delete('Temporary voice channel - empty');
-
-                logger.info(`Deleted temporary voice channel ${channel.name} (${channel.id}) in guild ${channel.guild.name}`);
-
-            } catch (error) {
-                logger.error(`Failed to delete temporary channel ${channel.id}:`, error);
-            }
-        }
-
-        async function transferChannelOwnership(client, channel, guildId, newOwnerId) {
-            try {
-                const config = await getJoinToCreateConfig(client, guildId);
-                const tempChannelInfo = config.temporaryChannels[channel.id];
-                
-                if (!tempChannelInfo) return;
-
-                config.temporaryChannels[channel.id].ownerId = newOwnerId;
-                await client.db.set(`guild:${guildId}:jointocreate`, config);
-
-                const newOwner = await channel.guild.members.fetch(newOwnerId);
-                if (newOwner) {
-                    const channelOptions = config.channelOptions?.[tempChannelInfo.triggerChannelId] || {};
-                    const nameTemplate = channelOptions.nameTemplate || config.channelNameTemplate;
-                    
-                    const newChannelName = sanitizeVoiceChannelName(formatChannelName(nameTemplate, {
-                        username: newOwner.user.username,
-                        userTag: newOwner.user.tag,
-                        displayName: newOwner.displayName,
-                        guildName: channel.guild.name,
-                        channelName: channel.guild.channels.cache.get(tempChannelInfo.triggerChannelId)?.name || 'Voice Channel'
-                    }));
-
-                    await channel.setName(newChannelName);
-                }
-
-                logger.info(`Transferred ownership of temporary channel ${channel.id} to user ${newOwnerId}`);
-
-            } catch (error) {
-                logger.error(`Failed to transfer ownership of channel ${channel.id}:`, error);
-            }
-        }
-    }
-};
-
-function sanitizeVoiceChannelName(inputName) {
-    const safeName = sanitizeInput(String(inputName || ''), MAX_CHANNEL_NAME_LENGTH)
-        .replace(/[\r\n\t]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    return safeName || FALLBACK_CHANNEL_NAME;
-}
-
-function clampVoiceBitrate(value) {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-        return DEFAULT_VOICE_BITRATE;
-    }
-
-    return Math.max(MIN_VOICE_BITRATE, Math.min(MAX_VOICE_BITRATE, Math.floor(parsed)));
-}
-
-function cleanupCooldownEntries() {
-    const now = Date.now();
-    for (const [key, timestamp] of channelCreationCooldown.entries()) {
-        if (now - timestamp >= VOICE_CREATE_COOLDOWN_MS) {
-            channelCreationCooldown.delete(key);
-        }
-    }
-}
-
-function trimCooldownMapIfNeeded() {
-    if (channelCreationCooldown.size <= MAX_TRACKED_COOLDOWNS) {
-        return;
-    }
-
-    const entries = [...channelCreationCooldown.entries()].sort((a, b) => a[1] - b[1]);
-    const removeCount = channelCreationCooldown.size - MAX_TRACKED_COOLDOWNS;
-    for (let index = 0; index < removeCount; index += 1) {
-        channelCreationCooldown.delete(entries[index][0]);
-    }
-}
-
-
-
