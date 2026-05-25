@@ -1,8 +1,4 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import pg from 'pg';
-
-const pgClient = new pg.Client({ connectionString: process.env.DATABASE_URL });
-pgClient.connect().catch(() => null);
 
 export default {
   data: new SlashCommandBuilder()
@@ -17,17 +13,18 @@ export default {
     let listaTekst = "";
     const kohaTani = Math.floor(Date.now() / 1000);
     const dbData = new Map();
+    
+    const dbQuery = interaction.client.db?.query || (interaction.client.db?.db ? (interaction.client.db.db.query ? interaction.client.db.db.query : null) : null);
 
-    // Lexojmë direkt nga databaza Postgres e pavarur
-    try {
-        await pgClient.query(`CREATE TABLE IF NOT EXISTS staff_duty (user_id TEXT PRIMARY KEY, total_time BIGINT)`).catch(() => null);
-        const rezultati = await pgClient.query(`SELECT * FROM staff_duty`).catch(() => null);
-        if (rezultati && rezultati.rows) {
-            for (const row of rezultati.rows) {
-                dbData.set(row.user_id, parseInt(row.total_time));
-            }
+    if (dbQuery) {
+      await dbQuery(`CREATE TABLE IF NOT EXISTS staff_duty (user_id TEXT PRIMARY KEY, total_time BIGINT)`).catch(() => null);
+      const rezultati = await dbQuery(`SELECT * FROM staff_duty`).catch(() => null);
+      if (rezultati && rezultati.rows) {
+        for (const row of rezultati.rows) {
+          dbData.set(row.user_id, parseInt(row.total_time));
         }
-    } catch (e) { }
+      }
+    }
 
     const gjitheUserat = new Set([
       ...dbData.keys(),
