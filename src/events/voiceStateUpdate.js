@@ -9,7 +9,6 @@ import {
 import { sanitizeInput } from '../utils/sanitization.js';
 import { logger } from '../utils/logger.js';
 
-// Kujtesa globale që nuk fshihet
 if (!global.staffDutyStart) global.staffDutyStart = new Map();
 if (!global.staffBackupTime) global.staffBackupTime = new Map();
 
@@ -23,37 +22,51 @@ export default {
         const cooldownKey = `${guildId}-${userId}`;
         cleanupCooldownEntries();
 
-        // --- SISTEMI I RI DHE I THJESHTË I KOHËS ---
+        // --- SISTEMI AUTOMATIK PËR TË GJITHË STAFIN ---
         try {
             const ID_KANALI_ZE_SPECIFIK = "1500903502501773373";
-            const ID_ROL_STAFF = "1500883679046664273";
+            const ID_ROL_STAFF_KRYESOR = "1435751640346132570"; // Roli që duhet të kenë që t'u numërohet koha
+            const ID_ROL_STAFF_DUTY = "1500883679046664273"; // Roli i detyrës që u jepet automatikisht
 
-            // 1. Kur stafi futet në kanal
-            if (newState.channelId === ID_KANALI_ZE_SPECIFIK && oldState.channelId !== ID_KANALI_ZE_SPECIFIK) {
-                await newState.member.roles.add(ID_ROL_STAFF).catch(() => null);
-                global.staffDutyStart.set(userId, Math.floor(Date.now() / 1000)); // Ruajmë sekondat e sakta
-            }
+            // Kontrollojmë nëse lojtari ka rolin e stafit kryesor
+            const eshteStaf = newState.member?.roles.cache.has(ID_ROL_STAFF_KRYESOR) || oldState.member?.roles.cache.has(ID_ROL_STAFF_KRYESOR);
 
-            // 2. Kur stafi del nga kanali
-            if (oldState.channelId === ID_KANALI_ZE_SPECIFIK && newState.channelId !== ID_KANALI_ZE_SPECIFIK) {
-                await newState.member.roles.remove(ID_ROL_STAFF).catch(() => null);
-                
-                const kohaFillimit = global.staffDutyStart.get(userId);
-                if (kohaFillimit) {
-                    const kohaTani = Math.floor(Date.now() / 1000);
-                    const sekondatKaluar = kohaTani - kohaFillimit; // Diferenca e saktë në sekonda
+            if (eshteStaf) {
+                // 1. Kur një anëtar stafi futet në kanal
+                if (newState.channelId === ID_KANALI_ZE_SPECIFIK && oldState.channelId !== ID_KANALI_ZE_SPECIFIK) {
+                    await newState.member.roles.add(ID_ROL_STAFF_DUTY).catch(() => null);
+                    global.staffDutyStart.set(userId, Math.floor(Date.now() / 1000));
+                }
 
-                    if (sekondatKaluar > 0) {
-                        const kohaAktuale = global.staffBackupTime.get(userId) || 0;
-                        global.staffBackupTime.set(userId, kohaAktuale + sekondatKaluar);
+                // 2. Kur një anëtar stafi del nga kanali
+                if (oldState.channelId === ID_KANALI_ZE_SPECIFIK && newState.channelId !== ID_KANALI_ZE_SPECIFIK) {
+                    await newState.member.roles.remove(ID_ROL_STAFF_DUTY).catch(() => null);
+                    
+                    const kohaFillimit = global.staffDutyStart.get(userId);
+                    if (kohaFillimit) {
+                        const kohaTani = Math.floor(Date.now() / 1000);
+                        const sekondatKaluar = kohaTani - kohaFillimit;
+
+                        if (sekondatKaluar > 0) {
+                            const dbQuery = client.db?.query || client.db?.db?.query;
+                            if (dbQuery) {
+                                await dbQuery(
+                                    `INSERT INTO staff_duty (user_id, total_time) VALUES ($1, $2) 
+                                     ON CONFLICT (user_id) DO UPDATE SET total_time = staff_duty.total_time + $2`,
+                                    [userId, sekondatKaluar]
+                                ).catch(() => null);
+                            }
+                            
+                            const kohaAktuale = global.staffBackupTime.get(userId) || 0;
+                            global.staffBackupTime.set(userId, kohaAktuale + sekondatKaluar);
+                        }
+                        global.staffDutyStart.delete(userId);
                     }
-                    global.staffDutyStart.delete(userId);
                 }
             }
         } catch (staffError) {
             logger.error(staffError);
         }
-        // --------------------------------------------
 
         try {
             const config = await getJoinToCreateConfig(client, guildId);
