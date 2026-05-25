@@ -22,8 +22,8 @@ export default {
         `**STATUS 🔌 Kodi i Qytetit**\n` +
         `🟢 Hapur  ${kodi}\n\n` +
         `🔗 **Linku i Qytetit 👥 Community i serverit**\n` +
-        `[Klikoni ketu per tu futur ne loje](${linkSrv})\n\n` +
-        `[Klikoni ketu per tu futur ne community](${linkGrp})\n\n` +
+        `[**Klikoni ketu per tu futur ne loje**](${linkSrv})\n\n` +
+        `[**Klikoni ketu per tu futur ne community**](${linkGrp})\n\n` +
         `🦅 **Shqiphamburg Roleplay Official Links**`
       )
       // Fotoja jote zyrtare e Shqiphamburg RP
