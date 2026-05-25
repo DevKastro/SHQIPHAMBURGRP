@@ -14,7 +14,7 @@ export default {
     const ID_ROL_QYTETARET = "**1489919705983746189**";
 
     const embed = new EmbedBuilder()
-      .setColor('#ff0000') // Ngjyra e Kuqe zyrtare e Shqiphamburg RP
+      .setColor('#008000') // Ngjyra e Kuqe zyrtare e Shqiphamburg RP
       .setTitle('🛡️ Shqiphamburg Roleplay')
       .setThumbnail(interaction.guild.iconURL({ dynamic: true })) // Logoja e vogël e serverit tënd lart djathtas
       .setDescription(
