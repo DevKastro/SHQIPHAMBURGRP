@@ -18,7 +18,7 @@ export default {
       .setTitle('🛡️ Shqiphamburg Roleplay')
       .setThumbnail(interaction.guild.iconURL({ dynamic: true })) // Logoja e vogël e serverit tënd lart djathtas
       .setDescription(
-        `*Serveri ristartohet kur personave i bën llag. Gjithashtu ju njoftojmë se serveri do të rihapet nesër!*\n\n` +
+        `**Serveri ristartohet kur personave i bën llag. Gjithashtu ju njoftojmë se serveri do të rihapet nesër!**\n\n` +
         `**STATUS 🔌 Kodi i Qytetit**\n` +
         `🟢 Hapur  ${kodi}\n\n` +
         `🔗 **Linku i Qytetit 👥 Community i serverit**\n` +
