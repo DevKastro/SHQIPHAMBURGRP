@@ -8,15 +8,15 @@ export default {
         const statusEmbed = new EmbedBuilder()
             .setColor('#00ff00') // Ngjyra e gjelbër (Online)
             .setTitle('🟢 STATUSI I SERVERIT ZYRTAR')
-            .setThumbnail(interaction.guild.iconURL({ dynamic: true })) // Shfaq logon e serverit tuaj automatikisht
+            .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
             .setDescription(`
 ✨ **SERVERI ESHTE ON HAJDENI**
 
 🔑 **KODI I SERVERIT:** \`zxxi9se1\`
 
-🎮 **LINKU I SERVERIT:** [Kliko Këtu Për Të Hyrë Në Server](https://www.roblox.com/share?v=v2&code=5ihdm3h6l67ncz)
+🎮 **LINKU I SERVERIT:** [Kliko Këtu Për Të Hyrë Në Server](https://roblox.com)
 
-👥 **GRUPI JON NE ROBLOX:** [Kliko Këtu Për Të Hyrë Në Grup](https://www.roblox.com/share/g/35906050)
+👥 **GRUPI JON NE ROBLOX:** [Kliko Këtu Për Të Hyrë Në Grup](https://roblox.com)
             `)
             .setFooter({ text: `Kërkuar nga ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL() })
             .setTimestamp();
