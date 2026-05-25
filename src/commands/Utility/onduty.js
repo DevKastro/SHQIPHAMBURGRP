@@ -3,37 +3,41 @@ import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 export default {
   data: new SlashCommandBuilder()
     .setName("onduty")
-    .setDescription("Shfaq sa kohë ka qëndruar stafi në kanalin e zërit"),
+    .setDescription("Shfaq kohen totale te qendrimit te stafit ne call"),
   async execute(interaction) {
-    // Kontrollojmë nëse ka të dhëna në kujtesë
-    if (!global.staffTotalTime || global.staffTotalTime.size === 0) {
-      return await interaction.reply({ content: "❌ Nuk ka ende të dhëna për stafin në detyrë.", ephemeral: true });
-    }
-
     const embed = new EmbedBuilder()
       .setColor("#00ffcc")
       .setTitle("📊 RAPORTI I KOHËS SË STAFF-IT NË CALL")
       .setTimestamp();
 
     let listaTekst = "";
+    const kohaTani = Math.floor(Date.now() / 1000);
 
-    for (const [userId, kohaTotaleMS] of global.staffTotalTime.entries()) {
-      let kohaAktualeMS = kohaTotaleMS;
-      
-      // Nëse janë ende brenda në call në këtë sekondë, shtojmë edhe kohën aktuale
+    // Krijojmë një listë me të gjithë përdoruesit që kanë qenë në detyrë
+    const gjitheUserat = new Set([
+      ...(global.staffBackupTime ? global.staffBackupTime.keys() : []),
+      ...(global.staffDutyStart ? global.staffDutyStart.keys() : [])
+    ]);
+
+    for (const userId of gjitheUserat) {
+      let sekondaTotale = global.staffBackupTime.get(userId) || 0;
+
+      // Nëse lojtari është LIVE në kanal aktualisht, shtojmë edhe sekondat live tani
       if (global.staffDutyStart && global.staffDutyStart.has(userId)) {
-        kohaAktualeMS += (Date.now() - global.staffDutyStart.get(userId));
+        const kohaFillimit = global.staffDutyStart.get(userId);
+        sekondaTotale += (kohaTani - kohaFillimit);
       }
 
-      const sekonda = Math.floor((kohaAktualeMS / 1000) % 60);
-      const minuta = Math.floor((kohaAktualeMS / (1000 * 60)) % 60);
-      const orë = Math.floor((kohaAktualeMS / (1000 * 60 * 60)));
+      if (sekondaTotale > 0) {
+        const sekonda = sekondaTotale % 60;
+        const minuta = Math.floor((sekondaTotale / 60) % 60);
+        const ore = Math.floor(sekondaTotale / 3600);
 
-      listaTekst += `• <@${userId}>: **${orë} Orë, ${minuta} Minuta, ${sekonda} Sekonda**\n`;
+        listaTekst += `• <@${userId}>: **${ore} Orë, ${minuta} Minuta, ${sekonda} Sekonda**\n`;
+      }
     }
 
-    embed.setDescription(listaTekst || "Asnjë staf nuk ka hyrë ende.");
+    embed.setDescription(listaTekst || "ℹ️ Nuk ka asnje staf aktualisht ne kanal dhe asnje te dhene te mbledhur.");
     await interaction.reply({ embeds: [embed] });
   },
 };
-
