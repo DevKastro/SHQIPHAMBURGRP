@@ -20,28 +20,41 @@ export default {
         `Reaction role reconciliation: scanned ${reconciliationSummary.scannedMessages}, removed ${reconciliationSummary.removedMessages}, errors ${reconciliationSummary.errors}`
       );
 
-      // --- SISTEMI AUTOMATIK ÇDO 1 ORË KE KANALET E CAKTUARA (NË HESHTJE) ---
-      startupLog("Sistemi i njoftimeve automatike çdo 1 orë u aktivizua!");
-      
+      // ------------------------------------------------------------------
+      // 🔥 FORCED REGISTRATION: DETYROJMË KOMANDAT TË SHKOJNË NË 2 SERVERAT E MI
+      // ------------------------------------------------------------------
+      try {
+        const serveratEmi = ["1505536422013304852", "1496144652938772500"];
+        const commandsData = Array.from(client.commands.values()).map(cmd => cmd.data.toJSON());
+
+        for (const guildId of serveratEmi) {
+          await client.rest.put(
+            `/applications/${client.user.id}/guilds/${guildId}/commands`,
+            { body: commandsData }
+          );
+          startupLog(`[Auto-Deploy]: ✅ Komandat u detyruan të shkojnë në serverin: ${guildId}`);
+        }
+      } catch (deployError) {
+        logger.error("[Auto-Deploy Error]: Nuk i regjistrova dot komandat:", deployError);
+      }
+      // ------------------------------------------------------------------
+
+      // --- SISTEMI AUTOMATIK ÇDO 15 MINUTA KE KANALET E CAKTUARA (NË HESHTJE) ---
+      startupLog("Sistemi i njoftimeve automatike çdo 15 minuta u aktivizua!");
       const kanaletELejuara = ["メdiskutime", "メscreenshot", "メcasino", "🔵┃18tg-chat"];
 
-      // Parandalon dërgimin e dyfishtë nëse boti rindizet shpejt
       if (global.njoftimInterval) clearInterval(global.njoftimInterval);
 
-      // 3600000 milisekonda = saktësisht 1 orë
       global.njoftimInterval = setInterval(async () => {
         const guilds = client.guilds.cache;
-
         for (const [guildId, guild] of guilds) {
           const channels = guild.channels.cache;
-
           for (const [channelId, channel] of channels) {
             if (channel.type === ChannelType.GuildText && kanaletELejuara.includes(channel.name)) {
               try {
-                // Dërgon mesazhin në heshtje që të mos bëjë njoftim (Silent Message)
                 await channel.send({ 
                   content: '⚠️ **KUJDES:** MOS SHANI DHE LEXONI RREGULLAT! 📜',
-                  flags: [4096] 
+                  flags: [4096]
                 });
               } catch (err) {
                 logger.error(`Gabim gjatë dërgimit automatik në ${channel.name}:`, err);
@@ -49,7 +62,7 @@ export default {
             }
           }
         }
-      }, 3600000); 
+      }, 900000); 
       // -------------------------------------------------------------
 
     } catch (error) {
