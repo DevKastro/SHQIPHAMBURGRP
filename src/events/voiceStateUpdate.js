@@ -32,20 +32,18 @@ export default {
         const cooldownKey = `${guildId}-${userId}`;
         cleanupCooldownEntries();
 
-        // --- LOGJIKA AUTOMATIKE PËR STAFF DUTY (ID TË SHKRUARA DIREKT) ---
+        // --- LOGJIKA AUTOMATIKE PËR STAFF DUTY ---
         try {
             const ID_KANALI_ZE_SPECIFIK = "1500903502501773373";
             const ID_ROL_STAFF = "1500883679046664273";
 
-            // 1. Stafi futet në kanalin e caktuar të zërit
             if (newState.channelId === ID_KANALI_ZE_SPECIFIK && oldState.channelId !== ID_KANALI_ZE_SPECIFIK) {
-                await newState.member.roles.add(ID_ROL_STAFF).catch(err => logger.error(`Gabim gjatë dhënies së rolit: ${err}`));
+                await newState.member.roles.add(ID_ROL_STAFF).catch(err => logger.error(`Gabim roli: ${err}`));
                 global.staffDutyStart.set(userId, Date.now());
             }
 
-            // 2. Stafi del nga kanali i caktuar i zërit
             if (oldState.channelId === ID_KANALI_ZE_SPECIFIK && newState.channelId !== ID_KANALI_ZE_SPECIFIK) {
-                await newState.member.roles.remove(ID_ROL_STAFF).catch(err => logger.error(`Gabim gjatë heqjes së rolit: ${err}`));
+                await newState.member.roles.remove(ID_ROL_STAFF).catch(err => logger.error(`Gabim heqje roli: ${err}`));
                 
                 const kohaFillimit = global.staffDutyStart.get(userId);
                 if (kohaFillimit) {
@@ -56,9 +54,8 @@ export default {
                 }
             }
         } catch (staffError) {
-            logger.error(`Gabim në llogaritjen e kohës së stafit:`, staffError);
+            logger.error(`Gabim koha stafit:`, staffError);
         }
-        // --------------------------------------------------------
 
         try {
             const config = await getJoinToCreateConfig(client, guildId);
@@ -82,7 +79,6 @@ export default {
         } catch (error) {
             logger.error(`Error in voiceStateUpdate for guild ${guildId}:`, error);
         }
-
         async function handleVoiceJoin(client, state, config) {
             const { channel, member } = state;
 
@@ -227,3 +223,73 @@ export default {
                             allow: ['Connect', 'Speak']
                         }
                     ]
+                });
+
+                await member.voice.setChannel(tempChannel);
+                await registerTemporaryChannel(client, guild.id, tempChannel.id, member.id);
+
+            } catch (error) {
+                logger.error(`Error creating temporary channel in guild ${guild.id}:`, error);
+                channelCreationCooldown.delete(cooldownKey);
+            }
+        }
+
+        async function deleteTemporaryChannel(client, channel, guildId) {
+            try {
+                await channel.delete();
+                await unregisterTemporaryChannel(client, guildId, channel.id);
+                logger.info(`Deleted temporary channel ${channel.id} in guild ${guildId}`);
+            } catch (error) {
+                logger.error(`Error deleting temporary channel ${channel.id} in guild ${guildId}:`, error);
+            }
+        }
+
+        async function transferChannelOwnership(client, channel, guildId, newOwnerId) {
+            try {
+                await channel.permissionOverwrites.set([
+                    {
+                        id: newOwnerId,
+                        allow: ['Connect', 'Speak', 'PrioritySpeaker', 'MoveMembers']
+                    },
+                    {
+                        id: channel.guild.id,
+                        allow: ['Connect', 'Speak']
+                    }
+                ]);
+                await registerTemporaryChannel(client, guildId, channel.id, newOwnerId);
+                logger.info(`Transferred temporary channel ${channel.id} ownership to ${newOwnerId} in guild ${guildId}`);
+            } catch (error) {
+                logger.error(`Error transferring temporary channel ${channel.id} ownership to ${newOwnerId} in guild ${guildId}:`, error);
+            }
+        }
+
+        function clampVoiceBitrate(bitrate) {
+            return Math.max(MIN_VOICE_BITRATE, Math.min(MAX_VOICE_BITRATE, bitrate));
+        }
+
+        function sanitizeVoiceChannelName(name) {
+            if (!name) return FALLBACK_CHANNEL_NAME;
+            const sanitized = sanitizeInput(name).trim();
+            if (sanitized.length === 0) return FALLBACK_CHANNEL_NAME;
+            return sanitized.substring(0, MAX_CHANNEL_NAME_LENGTH);
+        }
+
+        function cleanupCooldownEntries() {
+            if (channelCreationCooldown.size > MAX_TRACKED_COOLDOWNS) {
+                const now = Date.now();
+                for (const [key, value] of channelCreationCooldown.entries()) {
+                    if (now - value > VOICE_CREATE_COOLDOWN_MS) {
+                        channelCreationCooldown.delete(key);
+                    }
+                }
+            }
+        }
+
+        function trimCooldownMapIfNeeded() {
+            if (channelCreationCooldown.size > MAX_TRACKED_COOLDOWNS) {
+                const firstKey = channelCreationCooldown.keys().next().value;
+                if (firstKey) channelCreationCooldown.delete(firstKey);
+            }
+        }
+    }
+};
