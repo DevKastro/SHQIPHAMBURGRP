@@ -17,7 +17,7 @@ export default {
 **6. 🔍 Bastisjet & Kontrollet:** Çdo kontroll personi ose makine duhet të bëhet me arsye të plotë ligjore brenda lojës (jo pa shkak).
             `)
             // Këtu mund të vendosësh një link të një fotoje me makinë apo karakter policie nëse dëshiron
-            .setImage('https://cdn.discordapp.com/attachments/1505541133458083910/1507447109249667133/1779018008984.png?ex=6a11ef05&is=6a109d85&hm=1fa33d8c7ae8b77addc627c7fb65b008ac8e5c821ea59efe61df94f117ee9d14&'); 
+            .setImage('https://cdn.discordapp.com/attachments/1505541145311051817/1509262679062220810/1779018008984.png?ex=6a1889e7&is=6a173867&hm=9d06bfc8afd060ded438a7d333f9277d37e4bdbaf9dffd2b7465471670adfb5d&'); 
 
         await interaction.reply({ embeds: [policeEmbed] });
     },
