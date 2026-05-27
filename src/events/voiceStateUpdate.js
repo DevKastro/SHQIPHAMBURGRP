@@ -11,6 +11,7 @@ import { logger } from '../utils/logger.js';
 
 if (!global.staffDutyStart) global.staffDutyStart = new Map();
 if (!global.staffBackupTime) global.staffBackupTime = new Map();
+if (!global.disconnectTimers) global.disconnectTimers = new Map();
 
 const channelCreationCooldown = new Map();
 const VOICE_CREATE_COOLDOWN_MS = 2000;
@@ -31,6 +32,7 @@ export default {
         const cooldownKey = `${guildId}-${userId}`;
         cleanupCooldownEntries();
 
+        // --- SISTEMI AUTOMATIK I STAFF DUTY + DISCONNECT 10 SEKRENDA ---
         try {
             const ID_KANALI_ZE_SPECIFIK = "1500903502501773373";
             const ID_ROL_STAFF_KRYESOR = "1435751640346132570";
@@ -42,11 +44,29 @@ export default {
                 if (newState.channelId === ID_KANALI_ZE_SPECIFIK && oldState.channelId !== ID_KANALI_ZE_SPECIFIK) {
                     await newState.member.roles.add(ID_ROL_STAFF_DUTY).catch(() => null);
                     global.staffDutyStart.set(userId, Math.floor(Date.now() / 1000));
+
+                    if (global.disconnectTimers.has(userId)) clearTimeout(global.disconnectTimers.get(userId));
+
+                    const timer = setTimeout(async () => {
+                        try {
+                            const memberAktual = newState.guild.members.cache.get(userId);
+                            if (memberAktual && memberAktual.voice.channelId === ID_KANALI_ZE_SPECIFIK) {
+                                await memberAktual.voice.setChannel(null).catch(() => null);
+                            }
+                        } catch (err) { }
+                    }, 10000);
+
+                    global.disconnectTimers.set(userId, timer);
                 }
 
                 if (oldState.channelId === ID_KANALI_ZE_SPECIFIK && newState.channelId !== ID_KANALI_ZE_SPECIFIK) {
                     await newState.member.roles.remove(ID_ROL_STAFF_DUTY).catch(() => null);
                     
+                    if (global.disconnectTimers.has(userId)) {
+                        clearTimeout(global.disconnectTimers.get(userId));
+                        global.disconnectTimers.delete(userId);
+                    }
+
                     const kohaFillimit = global.staffDutyStart.get(userId);
                     if (kohaFillimit) {
                         const kohaTani = Math.floor(Date.now() / 1000);
