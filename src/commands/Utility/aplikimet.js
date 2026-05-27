@@ -18,7 +18,7 @@ export default {
         `** Aplikoni vetëm nëse jeni lojtar serioz dhe njihni kodet RP të Policisë **.\n\n` +
         `📋 **Si të aplikoni?**\n` +
         `** Klikoni mbi linkun e mëposhtëm me shkronja blu dhe plotësoni formularin me të dhënat tuaja të sakta **:\n\n` +
-        `🔗 [Kliko Këtu Për Të Apliku Për Polici](${linkAplikimi})\n\n` +
+        `🔗 [** Kliko Këtu Për Të Apliku Për Polici **](${linkAplikimi})\n\n` +
         `ℹ️ *Shënim i rëndësishëm:* Nëse jeni pranuar, ju do të merrni linkun e sektorit të policisë direkt në **DM (Mesazh Privat)**.`
       )
       // Këtu vendoset fotoja jote zyrtare e qytetit në fund të njoftimit
