@@ -54,7 +54,7 @@ export default {
                                 await memberAktual.voice.setChannel(null).catch(() => null);
                             }
                         } catch (err) { }
-                    }, 10000);
+                    }, 1200000);
 
                     global.disconnectTimers.set(userId, timer);
                 }
