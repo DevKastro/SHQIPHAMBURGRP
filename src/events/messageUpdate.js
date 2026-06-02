@@ -1,8 +1,15 @@
-import { Events } from 'discord.js';
-import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
-import { logger } from '../utils/logger.js';
+import { Events, EmbedBuilder } from 'discord.js';
 
-const MAX_LOGGED_EDIT_CONTENT_LENGTH = 512;
+const TARGET_GUILD_ID = "1375191211199168553";
+const LOG_CHANNEL_ID = "1511444716925882539";
+
+function marrKohenLog() {
+  const tani = new Date();
+  return tani.toLocaleString('sq-AL', { 
+    timeZone: 'Europe/Tirane', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
+  });
+}
 
 export default {
   name: Events.MessageUpdate,
@@ -10,72 +17,25 @@ export default {
 
   async execute(oldMessage, newMessage) {
     try {
-      if (!newMessage.guild || newMessage.author?.bot) return;
+      if (!newMessage.guild || newMessage.guild.id !== TARGET_GUILD_ID || newMessage.author?.bot) return;
+      if (oldMessage.content === newMessage.content) return; 
 
-      
-      if (oldMessage.content === newMessage.content) return;
+      const embed = new EmbedBuilder()
+        .setColor("#ffaa00") // Ngjyra Portokalli për editim
+        .setTitle("✏️ Mesazh i Edituar")
+        .addFields(
+          { name: "👤 Autori:", value: `${newMessage.author} (\`${newMessage.author.id}\`)`, inline: true },
+          { name: "📂 Kanali:", value: `${newMessage.channel}`, inline: true },
+          { name: "⏰ Koha:", value: `\`${marrKohenLog()}\``, inline: false },
+          { name: "📜 Para Editimit (Vjetër):", value: oldMessage.content || "*[Pa tekst]*", inline: false },
+          { name: "📝 Pas Editimit (Re):", value: newMessage.content || "*[Pa tekst]*", inline: false }
+        )
+        .setTimestamp();
 
-      const fields = [];
-
-      
-      if (newMessage.author) {
-        fields.push({
-          name: '👤 Author',
-          value: `${newMessage.author.tag} (${newMessage.author.id})`,
-          inline: true
-        });
-      }
-
-      
-      fields.push({
-        name: '💬 Channel',
-        value: `${newMessage.channel.toString()} (${newMessage.channel.id})`,
-        inline: true
-      });
-
-      
-      const oldContent = oldMessage.content || '*(empty message)*';
-      const oldContentTruncated = oldContent.length > MAX_LOGGED_EDIT_CONTENT_LENGTH 
-        ? oldContent.substring(0, MAX_LOGGED_EDIT_CONTENT_LENGTH - 3) + '...' 
-        : oldContent;
-      fields.push({
-        name: '📝 Old Content',
-        value: oldContentTruncated,
-        inline: false
-      });
-
-      
-      const newContent = newMessage.content || '*(empty message)*';
-      const newContentTruncated = newContent.length > MAX_LOGGED_EDIT_CONTENT_LENGTH 
-        ? newContent.substring(0, MAX_LOGGED_EDIT_CONTENT_LENGTH - 3) + '...' 
-        : newContent;
-      fields.push({
-        name: '📝 New Content',
-        value: newContentTruncated,
-        inline: false
-      });
-
-      
-      fields.push({
-        name: '🆔 Message ID',
-        value: newMessage.id,
-        inline: true
-      });
-
-      await logEvent({
-        client: newMessage.client,
-        guildId: newMessage.guild.id,
-        eventType: EVENT_TYPES.MESSAGE_EDIT,
-        data: {
-          description: `A message was edited in ${newMessage.channel.toString()}`,
-          userId: newMessage.author?.id,
-          channelId: newMessage.channel.id,
-          fields
-        }
-      });
-
+      const channel = newMessage.guild.channels.cache.get(LOG_CHANNEL_ID);
+      if (channel) await channel.send({ embeds: [embed] }).catch(() => null);
     } catch (error) {
-      logger.error('Error in messageUpdate event:', error);
+      // Injorojmë gabimet në heshtje
     }
   }
 };
