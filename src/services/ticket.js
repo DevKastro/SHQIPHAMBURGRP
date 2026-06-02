@@ -22,11 +22,11 @@ import { ensureTypedServiceError } from '../utils/serviceErrorBoundary.js';
 
 function getPriorityMap() {
   const priorities = BotConfig.tickets?.priorities || {
-    none: { emoji: "⚪", color: "#95A5A6", label: "None" },
-    low: { emoji: "🟢", color: "#2ECC71", label: "Low" },
-    medium: { emoji: "🟡", color: "#F1C40F", label: "Medium" },
-    high: { emoji: "🔴", color: "#E74C3C", label: "High" },
-    urgent: { emoji: "🚨", color: "#E91E63", label: "Urgent" },
+    none: { emoji: "⚪", color: "#95A5A6", label: "Asnje" },
+    low: { emoji: "🟢", color: "#2ECC71", label: "Ulet" },
+    medium: { emoji: "🟡", color: "#F1C40F", label: "E mesme" },
+    high: { emoji: "🔴", color: "#E74C3C", label: "E lart" },
+    urgent: { emoji: "🚨", color: "#E91E63", label: "Urgjente" },
   };
   
   const map = {};
@@ -80,7 +80,7 @@ export async function createTicket(guild, member, categoryId, reason = 'No reaso
     if (currentTicketCount >= maxTicketsPerUser) {
       return {
         success: false,
-        error: `You have reached the maximum number of open tickets (${maxTicketsPerUser}). Please close your existing tickets before creating a new one.`
+        error: `Ke arritur numrin maksimal të biletave të hapura (${maxTicketsPerUser}).Ju lutemi mbyllni biletat tuaja ekzistuese përpara se të krijoni një të re.`
       };
     }
     
@@ -165,21 +165,21 @@ export async function createTicket(guild, member, categoryId, reason = 'No reaso
       description: `${member.toString()}, thanks for creating a ticket!\n\n**Reason:** ${reason}\n**Priority:** ${priorityInfo.emoji} ${priorityInfo.label}`,
       color: priorityInfo.color,
       fields: [
-        { name: 'Status', value: '🟢 Open', inline: true },
-        { name: 'Claimed By', value: 'Not claimed', inline: true },
-        { name: 'Created', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
+        { name: 'Status', value: '🟢 Hapur', inline: true },
+        { name: 'E marrur nga', value: 'Jo e marrë', inline: true },
+        { name: 'Krijuar', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
       ],
     });
     
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('ticket_close')
-        .setLabel('Close Ticket')
+        .setLabel('Mbyll Biletën')
         .setStyle(ButtonStyle.Danger)
         .setEmoji('🔒'),
       new ButtonBuilder()
         .setCustomId('ticket_claim')
-        .setLabel('Claim')
+        .setLabel('Merr')
         .setStyle(ButtonStyle.Primary)
         .setEmoji('🙋'),
       new ButtonBuilder()
@@ -297,8 +297,8 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
         const ticketCreator = await channel.client.users.fetch(ticketData.userId).catch(() => null);
         if (ticketCreator) {
           const dmEmbed = createEmbed({
-            title: '🎫 Your Ticket Has Been Closed',
-            description: `Your ticket **${channel.name}** has been closed.\n\n**Reason:** ${reason}\n**Closed by:** ${closer.tag}\n**Closed at:** <t:${Math.floor(Date.now() / 1000)}:F>\n\nThank you for using our support system! If you have any further questions, feel free to create a new ticket.`,
+            title: '🎫 Bileta juaj është mbyllur',
+            description: `Bileta juaj **${channel.name}** është mbyllur.\n\n**Arsyja:** ${reason}\n**Mbyllur nga:** ${closer.tag}\n**Closed at:** <t:${Math.floor(Date.now() / 1000)}:F>\n\nFaleminderit që përdorni sistemin tonë të mbështetjes! Nëse keni pyetje të mëtejshme, mos ngurroni të krijoni një tiketë të re.`,
             color: '#e74c3c',
             footer: { text: `Ticket ID: ${ticketData.id}` }
           });
@@ -308,10 +308,10 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
           // Post-close feedback survey — separate DM message so it can be updated on submit
           try {
             const feedbackEmbed = createEmbed({
-              title: '⭐ How was your support experience?',
-              description: `We'd love to know how we did with **${channel.name}**.\nSelect a rating below — it only takes a second!`,
+              title: '⭐ Si ishte përvoja juaj me mbështetjen?',
+              description: `Do të na pëlqente të dinim se si ia dolëm me **${channel.name}**.\nZgjidh një vlerësim më poshtë — duhet vetëm një sekondë!`,
               color: '#F1C40F',
-              footer: { text: 'Your feedback helps us improve.' },
+              footer: { text: 'Reagimet tuaja na ndihmojnë të përmirësohemi.' },
             });
 
             const base = `ticket_feedback:${channel.guild.id}:${channel.id}`;
@@ -325,7 +325,7 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
             const declineRow = new ActionRowBuilder().addComponents(
               new ButtonBuilder()
                 .setCustomId(`ticket_feedback_decline:${channel.guild.id}:${channel.id}`)
-                .setLabel('❌ No thanks')
+                .setLabel('❌ Jo faleminderit')
                 .setStyle(ButtonStyle.Secondary),
             );
 
@@ -334,11 +334,11 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
               components: [starsRow, declineRow],
             });
           } catch (feedbackError) {
-            logger.warn(`Could not send feedback survey to ticket creator ${ticketData.userId}: ${feedbackError.message}`);
+            logger.warn(`Nuk mund të dërgohej një anketë me reagime te krijuesi i biletave ${ticketData.userId}: ${feedbackError.message}`);
           }
         }
       } catch (dmError) {
-          logger.warn(`Could not send DM to ticket creator ${ticketData.userId}: ${dmError.message}`);
+          logger.warn(`Nuk mund të dërgoja mesazh direkt te krijuesi i biletave ${ticketData.userId}: ${dmError.message}`);
       }
     }
     
@@ -361,7 +361,7 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
         }
       }
     } catch (permError) {
-        logger.warn(`Could not update user permissions for closed ticket: ${permError.message}`);
+        logger.warn(`Nuk mund të përditësoheshin lejet e përdoruesit për biletën e mbyllur: ${permError.message}`);
     }
     
     const messages = await channel.messages.fetch();
@@ -375,12 +375,12 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
       const statusField = embed.fields?.find(f => f.name === 'Status');
       
       if (statusField) {
-        statusField.value = '🔴 Closed';
+        statusField.value = '🔴 Mbyllur';
       }
       
       const updatedEmbed = createEmbed({
-        title: embed.title || 'Ticket',
-        description: embed.description || 'Ticket discussion',
+        title: embed.title || 'Biletë',
+        description: embed.description || 'Diskutimi i biletave',
         color: '#e74c3c',
         fields: embed.fields || [],
         footer: embed.footer
@@ -393,8 +393,8 @@ components: []
     }
     
     const closeEmbed = createEmbed({
-      title: 'Ticket Closed',
-      description: `This ticket has been closed by ${closer}.\n**Reason:** ${reason}${dmOnClose ? '\n\n📩 A DM has been sent to the ticket creator.' : ''}`,
+      title: 'Bileta e Mbyllur',
+      description: `Kjo biletë është mbyllur nga ${closer}.\n**Reason:** ${reason}${dmOnClose ? '\n\n📩 Një mesazh i drejtpërdrejtë i është dërguar krijuesit të biletës.' : ''}`,
       color: '#e74c3c',
       footer: { text: `Ticket ID: ${ticketData.id}` }
     });
@@ -402,12 +402,12 @@ components: []
     const controlRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('ticket_reopen')
-        .setLabel('Reopen Ticket')
+        .setLabel('Rihap biletën')
         .setStyle(ButtonStyle.Success)
         .setEmoji('🔓'),
       new ButtonBuilder()
         .setCustomId('ticket_delete')
-        .setLabel('Delete Ticket')
+        .setLabel('Fshi Biletën')
         .setStyle(ButtonStyle.Danger)
         .setEmoji('🗑️')
     );
@@ -438,11 +438,11 @@ components: []
     const typedError = ensureTypedServiceError(error, {
       service: 'ticketService',
       operation: 'closeTicket',
-      message: 'Ticket operation failed: closeTicket',
-      userMessage: 'Failed to close ticket. Please try again in a moment.',
+      message: 'Operacioni i biletës dështoi: mbyll Biletën',
+      userMessage: 'Mbyllja e biletës dështoi. Ju lutemi provoni përsëri pas pak.',
       context: { guildId: channel?.guild?.id, channelId: channel?.id, closerId: closer?.id }
     });
-    logger.error('Error closing ticket:', {
+    logger.error('Gabim në mbylljen e biletës:', {
       guildId: channel?.guild?.id,
       channelId: channel?.id,
       userId: closer?.id,
@@ -493,12 +493,12 @@ export async function claimTicket(channel, claimer) {
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('ticket_close')
-          .setLabel('Close Ticket')
+          .setLabel('Mbyll Biletën')
           .setStyle(ButtonStyle.Danger)
           .setEmoji('🔒'),
         new ButtonBuilder()
           .setCustomId('ticket_claim')
-          .setLabel('Claimed')
+          .setLabel('E marrur')
           .setStyle(ButtonStyle.Secondary)
           .setEmoji('🙋')
           .setDisabled(true),
@@ -516,22 +516,22 @@ export async function claimTicket(channel, claimer) {
     }
     
     const claimEmbed = createEmbed({
-      title: 'Ticket Claimed',
-      description: `🎉 ${claimer} has claimed this ticket!`,
+      title: 'Bileta e marrë',
+      description: `🎉 ${claimer} e ka marrë këtë biletë!`,
       color: '#2ecc71'
     });
     
     const unclaimRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('ticket_unclaim')
-        .setLabel('Unclaim')
+        .setLabel('Pa marrë')
         .setStyle(ButtonStyle.Secondary)
         .setEmoji('🔓')
     );
 
     const claimStatusMessage = messages.find(m =>
       m.embeds.length > 0 &&
-      (m.embeds[0].title === 'Ticket Claimed' || m.embeds[0].title === 'Ticket Unclaimed')
+      (m.embeds[0].title === 'Bileta e marrë' || m.embeds[0].title === 'Pa marrë')
     );
 
     if (claimStatusMessage) {
@@ -544,7 +544,7 @@ export async function claimTicket(channel, claimer) {
       client: channel.client,
       guildId: channel.guild.id,
       event: {
-        type: 'claim',
+        type: 'Marrë',
         ticketId: channel.id,
         ticketNumber: ticketData.id,
         userId: ticketData.userId,
