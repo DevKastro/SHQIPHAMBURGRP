@@ -1,31 +1,26 @@
-import { ChannelType, PermissionFlagsBits } from 'discord.js';
-import {
-    getJoinToCreateConfig, 
-    registerTemporaryChannel, 
-    unregisterTemporaryChannel,
-    getTemporaryChannelInfo,
-    formatChannelName
-} from '../utils/database.js';
+import { ChannelType, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
+import { getJoinToCreateConfig, registerTemporaryChannel, unregisterTemporaryChannel, getTemporaryChannelInfo, formatChannelName } from '../utils/database.js';
 import { sanitizeInput } from '../utils/sanitization.js';
 import { logger } from '../utils/logger.js';
 
 if (!global.staffDutyStart) global.staffDutyStart = new Map();
 if (!global.staffBackupTime) global.staffBackupTime = new Map();
 if (!global.disconnectTimers) global.disconnectTimers = new Map();
-
-// --- MEMORIA E RE PËR POLICINË ---
 if (!global.policeDutyStart) global.policeDutyStart = new Map();
 if (!global.policeBackupTime) global.policeBackupTime = new Map();
 if (!global.policeDisconnectTimers) global.policeDisconnectTimers = new Map();
 
-const channelCreationCooldown = new Map();
-const VOICE_CREATE_COOLDOWN_MS = 2000;
-const DEFAULT_VOICE_BITRATE = 64000;
-const MAX_VOICE_BITRATE = 384000;
-const MIN_VOICE_BITRATE = 8000;
-const MAX_CHANNEL_NAME_LENGTH = 100;
-const FALLBACK_CHANNEL_NAME = 'Voice Room';
-const MAX_TRACKED_COOLDOWNS = 10000;
+// Konfigurimet për njoftimet (Logs) e kanalit të zërit
+const LOGS_GUILD_ID = "1375191211199168553";
+const LOGS_CHANNEL_ID = "1511444716925882539";
+
+function marrKohenLog() {
+  const tani = new Date();
+  return tani.toLocaleString('sq-AL', { 
+    timeZone: 'Europe/Tirane', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
+  });
+}
 
 export default {
     name: 'voiceStateUpdate',
@@ -35,24 +30,61 @@ export default {
         const guildId = newState.guild.id;
         const userId = newState.member.id;
         const cooldownKey = `${guildId}-${userId}`;
-        cleanupCooldownEntries();
 
-        // ------------------------------------------------------------------
-        // 🚨 SISTEMI AUTOMATIK I RI PËR POLICINË (DISCONNECT 20 MINUTA)
-        // ------------------------------------------------------------------
+        // --- SISTEMI ZYRTAR I NJOFTIMEVE (LOGS) TË ZËRIT ---
+        try {
+            if (guildId === LOGS_GUILD_ID) {
+                const logChannel = newState.guild.channels.cache.get(LOGS_CHANNEL_ID);
+                if (logChannel) {
+                    const embed = new EmbedBuilder().setTimestamp();
+                    const userTekst = `${newState.member.user} (\`${userId}\`)`;
+                    const kohaTekst = `\`${marrKohenLog()}\``;
+
+                    // Hyrje në kanal zëri
+                    if (!oldState.channelId && newState.channelId) {
+                        embed.setColor("#00ff00").setTitle("🔊 Hyrje në Kanal Zëri")
+                          .addFields(
+                            { name: "👤 Lojtari:", value: userTekst, inline: true },
+                            { name: "📞 Kanal i Ri:", value: `${newState.channel}`, inline: true },
+                            { name: "⏰ Koha:", value: kohaTekst, inline: false }
+                          );
+                        await logChannel.send({ embeds: [embed] }).catch(() => null);
+                    }
+                    // Dalje nga kanal zëri
+                    else if (oldState.channelId && !newState.channelId) {
+                        embed.setColor("#ff0000").setTitle("🔇 Dalje nga Kanal Zëri")
+                          .addFields(
+                            { name: "👤 Lojtari:", value: userTekst, inline: true },
+                            { name: "📞 Kanali i Vjetër:", value: `${oldState.channel}`, inline: true },
+                            { name: "⏰ Koha:", value: kohaTekst, inline: false }
+                          );
+                        await logChannel.send({ embeds: [embed] }).catch(() => null);
+                    }
+                    // Lëvizje midis kanaleve të zërit
+                    else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+                        embed.setColor("#00aaff").setTitle("🔀 Lëvizje në Kanal Zëri")
+                          .addFields(
+                            { name: "👤 Lojtari:", value: userTekst, inline: false },
+                            { name: "📞 Prej Kanalit:", value: `${oldState.channel}`, inline: true },
+                            { name: "📞 Tek Kanali:", value: `${newState.channel}`, inline: true },
+                            { name: "⏰ Koha:", value: kohaTekst, inline: false }
+                          );
+                        await logChannel.send({ embeds: [embed] }).catch(() => null);
+                    }
+                }
+            }
+        } catch (logErr) { logger.error(logErr); }
+
+        // --- SISTEMI AUTOMATIK I RI PËR POLICINË ---
         try {
             const KANALET_POLICIS = ["1509282358765944953", "1509282398171566171", "1509282439497912603"];
             const ID_ROL_POLICIA = "1510664150123286538";
-
             const eshtePolice = newState.member?.roles.cache.has(ID_ROL_POLICIA) || oldState.member?.roles.cache.has(ID_ROL_POLICIA);
 
             if (eshtePolice) {
-                // 1. Kur polici futet në një nga 3 kanalet
                 if (KANALET_POLICIS.includes(newState.channelId) && !KANALET_POLICIS.includes(oldState.channelId)) {
                     global.policeDutyStart.set(userId, Math.floor(Date.now() / 1000));
-
                     if (global.policeDisconnectTimers.has(userId)) clearTimeout(global.policeDisconnectTimers.get(userId));
-
                     const pTimer = setTimeout(async () => {
                         try {
                             const memberAktual = newState.guild.members.cache.get(userId);
@@ -60,31 +92,19 @@ export default {
                                 await memberAktual.voice.setChannel(null).catch(() => null);
                             }
                         } catch (err) { }
-                    }, 1200000); // 20 minuta
-
+                    }, 1200000);
                     global.policeDisconnectTimers.set(userId, pTimer);
                 }
-
-                // 2. Kur polici del ose bëhet disconnect nga boti
                 if (KANALET_POLICIS.includes(oldState.channelId) && !KANALET_POLICIS.includes(newState.channelId)) {
-                    if (global.policeDisconnectTimers.has(userId)) {
-                        clearTimeout(global.policeDisconnectTimers.get(userId));
-                        global.policeDisconnectTimers.delete(userId);
-                    }
-
+                    if (global.policeDisconnectTimers.has(userId)) { clearTimeout(global.policeDisconnectTimers.get(userId)); global.policeDisconnectTimers.delete(userId); }
                     const kohaStart = global.policeDutyStart.get(userId);
                     if (kohaStart) {
                         const sekondatKaluar = Math.floor(Date.now() / 1000) - kohaStart;
-
                         if (sekondatKaluar > 0) {
                             const dbQuery = client.db?.query || (client.db?.db?.query ? client.db.db.query : null);
                             if (dbQuery) {
                                 await dbQuery(`CREATE TABLE IF NOT EXISTS police_duty (user_id TEXT PRIMARY KEY, total_time BIGINT)`).catch(() => null);
-                                await dbQuery(
-                                    `INSERT INTO police_duty (user_id, total_time) VALUES ($1, $2) 
-                                     ON CONFLICT (user_id) DO UPDATE SET total_time = police_duty.total_time + $2`,
-                                    [userId, sekondatKaluar]
-                                ).catch(() => null);
+                                await dbQuery(`INSERT INTO police_duty (user_id, total_time) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET total_time = police_duty.total_time + $2`, [userId, sekondatKaluar]).catch(() => null);
                             }
                             const kohaAktuale = global.policeBackupTime.get(userId) || 0;
                             global.policeBackupTime.set(userId, kohaAktuale + sekondatKaluar);
@@ -94,10 +114,7 @@ export default {
                 }
             }
         } catch (err) { logger.error(err); }
-
-        // ------------------------------------------------------------------
-        // 👥 SISTEMI KRYESOR I STAFF DUTY (QË FUNKSIONONTE MË PARË)
-        // ------------------------------------------------------------------
+        // --- SISTEMI KRYESOR I STAFF DUTY ---
         try {
             const ID_KANALI_ZE_SPECIFIK = "1500903502501773373";
             const ID_ROL_STAFF_KRYESOR = "1435751640346132570";
@@ -119,7 +136,7 @@ export default {
                                 await memberAktual.voice.setChannel(null).catch(() => null);
                             }
                         } catch (err) { }
-                    }, 1200000); // 20 minuta
+                    }, 1200000);
 
                     global.disconnectTimers.set(userId, timer);
                 }
@@ -138,7 +155,7 @@ export default {
                         const sekondatKaluar = kohaTani - kohaFillimit;
 
                         if (sekondatKaluar > 0) {
-                            const dbQuery = client.db?.query || (client.db?.db ? (client.db.db.query ? client.db.db.query : null) : null);
+                            const dbQuery = client.db?.query || (client.db?.db ? (client.db.db.query : null) : null);
                             if (dbQuery) {
                                 await dbQuery(`CREATE TABLE IF NOT EXISTS staff_duty (user_id TEXT PRIMARY KEY, total_time BIGINT)`).catch(() => null);
                                 await dbQuery(
@@ -159,6 +176,7 @@ export default {
         try {
             const config = await getJoinToCreateConfig(client, guildId);
             if (!config.enabled || config.triggerChannels.length === 0) return;
+            
             if (!oldState.channel && newState.channel) await handleVoiceJoin(client, newState, config);
             if (oldState.channel && !newState.channel) await handleVoiceLeave(client, oldState, config);
             if (oldState.channel && newState.channel && oldState.channel.id !== newState.channel.id) await handleVoiceMove(client, oldState, newState, config);
@@ -192,7 +210,7 @@ export default {
 
             if (member.voice.channel?.id !== channel.id) return;
             channelCreationCooldown.set(cooldownKey, now);
-            trimCooldownMapIfNeeded();
+            cleanupCooldownEntries();
             await createTemporaryChannel(client, state, config);
         }
 
@@ -266,18 +284,14 @@ export default {
 
                 await member.voice.setChannel(tempChannel);
                 await registerTemporaryChannel(client, guild.id, tempChannel.id, member.id);
-            } catch (error) {
-                logger.error(error);
-            }
+            } catch (error) { logger.error(error); }
         }
 
         async function deleteTemporaryChannel(client, channel, guildId) {
             try {
                 await channel.delete();
                 await unregisterTemporaryChannel(client, guildId, channel.id);
-            } catch (error) {
-                logger.error(error);
-            }
+            } catch (error) { logger.error(error); }
         }
 
         async function transferChannelOwnership(client, channel, guildId, newOwnerId) {
@@ -287,9 +301,7 @@ export default {
                     { id: channel.guild.id, allow: ['Connect', 'Speak'] }
                 ]);
                 await registerTemporaryChannel(client, guildId, channel.id, newOwnerId);
-            } catch (error) {
-                logger.error(error);
-            }
+            } catch (error) { logger.error(error); }
         }
 
         function clampVoiceBitrate(bitrate) {
@@ -309,13 +321,6 @@ export default {
                 for (const [key, value] of channelCreationCooldown.entries()) {
                     if (now - value > VOICE_CREATE_COOLDOWN_MS) channelCreationCooldown.delete(key);
                 }
-            }
-        }
-
-        function trimCooldownMapIfNeeded() {
-            if (channelCreationCooldown.size > MAX_TRACKED_COOLDOWNS) {
-                const firstKey = channelCreationCooldown.keys().next().value;
-                if (firstKey) channelCreationCooldown.delete(firstKey);
             }
         }
     }
