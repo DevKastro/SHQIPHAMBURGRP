@@ -1,4 +1,4 @@
-import { Events, EmbedBuilder, AuditLogEvent } from 'discord.js';
+import { Events, EmbedBuilder } from 'discord.js';
 import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
 import { logger } from '../utils/logger.js';
 
@@ -21,18 +21,19 @@ export default {
     try {
       if (!newMember.guild) return;
 
-      // --- 1. LOGJIKA RE PËR TIMEOUT (MUTE) ---
+      // --- 1. LOGJIKA E RE PËR TIMEOUT (MUTE) ---
       if (newMember.guild.id === TARGET_GUILD_ID) {
         const kohaTimeoutVjeter = oldMember.communicationDisabledUntilTimestamp;
         const kohaTimeoutRe = newMember.communicationDisabledUntilTimestamp;
 
         if (!kohaTimeoutVjeter && kohaTimeoutRe) {
-          let stafiAksionit = "Nuk u gjet";
-          let arsyejaAksionit = "Pa arsye";
+          let stafiAksionit = "Mod Manual / Panel / Bot";
+          let arsyejaAksionit = "E shkruar në komandë";
 
+          // Kodi nuk do të bllokohet më nëse dështon leximi i Audit Logs
           try {
-            const auditLogs = await newMember.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberUpdate });
-            const updateLog = auditLogs.entries.first();
+            const auditLogs = await newMember.guild.fetchAuditLogs({ limit: 1, type: 24 }).catch(() => null);
+            const updateLog = auditLogs?.entries?.first();
             if (updateLog && updateLog.target.id === newMember.id) {
               stafiAksionit = `${updateLog.executor} (\`${updateLog.executor.id}\`)`;
               arsyejaAksionit = updateLog.reason || "Pa arsye";
