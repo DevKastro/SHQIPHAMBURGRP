@@ -1,9 +1,15 @@
-import { Events } from 'discord.js';
-import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
-import { logger } from '../utils/logger.js';
-import { getReactionRoleMessage, deleteReactionRoleMessage } from '../services/reactionRoleService.js';
+import { Events, EmbedBuilder } from 'discord.js';
 
-const MAX_LOGGED_MESSAGE_CONTENT_LENGTH = 1024;
+const TARGET_GUILD_ID = "1375191211199168553";
+const LOG_CHANNEL_ID = "1511444716925882539";
+
+function marrKohenLog() {
+  const tani = new Date();
+  return tani.toLocaleString('sq-AL', { 
+    timeZone: 'Europe/Tirane', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
+  });
+}
 
 export default {
   name: Events.MessageDelete,
@@ -11,118 +17,23 @@ export default {
 
   async execute(message) {
     try {
-      if (!message.guild) return;
+      if (!message.guild || message.guild.id !== TARGET_GUILD_ID || message.author?.bot) return;
 
-      try {
-        const reactionRoleData = await getReactionRoleMessage(message.client, message.guild.id, message.id);
-        if (reactionRoleData) {
-          await deleteReactionRoleMessage(message.client, message.guild.id, message.id);
-          logger.info(`Cleaned up reaction role database entry for manually deleted message ${message.id} in guild ${message.guild.id}`);
+      const embed = new EmbedBuilder()
+        .setColor("#ff0000") // Ngjyra e Kuqe për fshirje
+        .setTitle("🗑️ Mesazh i Fshirë")
+        .addFields(
+          { name: "👤 Autori:", value: `${message.author} (\`${message.author.id}\`)`, inline: true },
+          { name: "📂 Kanali:", value: `${message.channel}`, inline: true },
+          { name: "⏰ Koha:", value: `\`${marrKohenLog()}\``, inline: false },
+          { name: "💬 Përmbajtja e Mesazhit:", value: message.content || "*[Pa tekst ose skedar]*", inline: false }
+        )
+        .setTimestamp();
 
-          try {
-            await logEvent({
-              client: message.client,
-              guildId: message.guild.id,
-              eventType: EVENT_TYPES.REACTION_ROLE_DELETE,
-              data: {
-                description: `Reaction role message was deleted manually and removed from database.`,
-                channelId: message.channel?.id,
-                fields: [
-                  {
-                    name: '🗑️ Message ID',
-                    value: message.id,
-                    inline: true
-                  },
-                  {
-                    name: '📍 Channel',
-                    value: message.channel ? `${message.channel.toString()} (${message.channel.id})` : 'Unknown',
-                    inline: true
-                  },
-                  {
-                    name: '🧹 Cleanup',
-                    value: 'Database entry removed automatically',
-                    inline: false
-                  }
-                ]
-              }
-            });
-          } catch (logCleanupError) {
-            logger.warn('Failed to log reaction role cleanup after manual message deletion:', logCleanupError);
-          }
-        }
-      } catch (reactionRoleCleanupError) {
-        logger.warn(`Failed to clean up reaction role data for deleted message ${message.id}:`, reactionRoleCleanupError);
-      }
-
-      if (message.author?.bot) return;
-
-      const fields = [];
-
-      
-      if (message.author) {
-        fields.push({
-          name: '👤 Author',
-          value: `${message.author.tag} (${message.author.id})`,
-          inline: true
-        });
-      }
-
-      
-      fields.push({
-        name: '💬 Channel',
-        value: `${message.channel.toString()} (${message.channel.id})`,
-        inline: true
-      });
-
-      
-      if (message.content) {
-        const content = message.content.length > MAX_LOGGED_MESSAGE_CONTENT_LENGTH 
-          ? message.content.substring(0, MAX_LOGGED_MESSAGE_CONTENT_LENGTH - 3) + '...' 
-          : message.content;
-        fields.push({
-          name: '📝 Content',
-          value: content || '*(empty message)*',
-          inline: false
-        });
-      }
-
-      
-      fields.push({
-        name: '🆔 Message ID',
-        value: message.id,
-        inline: true
-      });
-
-      
-      fields.push({
-        name: '📅 Created',
-        value: `<t:${Math.floor(message.createdTimestamp / 1000)}:R>`,
-        inline: true
-      });
-
-      
-      if (message.attachments.size > 0) {
-        fields.push({
-          name: '📎 Attachments',
-          value: message.attachments.size.toString(),
-          inline: true
-        });
-      }
-
-      await logEvent({
-        client: message.client,
-        guildId: message.guild.id,
-        eventType: EVENT_TYPES.MESSAGE_DELETE,
-        data: {
-          description: `A message was deleted in ${message.channel.toString()}`,
-          userId: message.author?.id,
-          channelId: message.channel.id,
-          fields
-        }
-      });
-
+      const channel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
+      if (channel) await channel.send({ embeds: [embed] }).catch(() => null);
     } catch (error) {
-      logger.error('Error in messageDelete event:', error);
+      // Injorojmë gabimet në heshtje që boti të mos bëjë crash
     }
   }
 };
