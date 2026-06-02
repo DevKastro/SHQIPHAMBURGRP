@@ -387,3 +387,44 @@ try {
 }
 
 export default TitanBot;
+    app.get('/ready', (req, res) => {
+      res.status(200).json({ ready: true, message: 'Bot is ready' });
+    });
+
+    app.get('/', (req, res) => {
+      res.status(200).json({ message: 'TitanBot System Online', version: '2.0.0' });
+    });
+
+    app.listen(configuredPort, '0.0.0.0', () => {
+      startupLog(`✅ Web Server running on port ${configuredPort}`);
+    });
+  }
+
+  setupCronJobs() {
+    cron.schedule('0 6 * * *', () => checkBirthdays(this));
+    cron.schedule('* * * * *', () => checkGiveaways(this));
+  }
+
+  async loadHandlers() {
+    try {
+      const module = await import('./handlers/events.js');
+      if (typeof module.default === 'function') await module.default(this);
+      logger.info(`✅ Loaded events handler`);
+    } catch (error) {
+      logger.error(`❌ Failed to load events handler:`, error.message);
+    }
+  }
+
+  async registerCommands() {}
+  async shutdown() { process.exit(0); }
+}
+
+try {
+  const bot = new TitanBot();
+  bot.start();
+} catch (error) {
+  logger.error('Fatal error during bot startup:', error);
+  process.exit(1);
+}
+
+export default TitanBot;
