@@ -1,5 +1,5 @@
 ﻿import 'dotenv/config';
-import { Client, Collection, GatewayIntentBits } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
 import { REST } from '@discordjs/rest';
 import express from 'express';
 import cron from 'node-cron';
@@ -17,20 +17,19 @@ class TitanBot extends Client {
   constructor() {
     super({
       intents: [
-        
         GatewayIntentBits.Guilds,                        
         GatewayIntentBits.GuildMembers,                 
-        
-        
         GatewayIntentBits.GuildMessages,                
         GatewayIntentBits.GuildMessageReactions,        
         GatewayIntentBits.MessageContent,               
-        
         GatewayIntentBits.GuildVoiceStates,             
-        
-        
         GatewayIntentBits.GuildBans,                    
       ],
+      partials: [
+        Partials.Message,
+        Partials.Channel,
+        Partials.Reaction
+      ]
     });
 
     this.config = config;
@@ -53,7 +52,6 @@ class TitanBot extends Client {
       const dbInstance = await initializeDatabase();
       this.db = dbInstance.db;
       
-      // Check database status and report
       const dbStatus = this.db.getStatus();
       if (dbStatus.isDegraded) {
         logger.warn('');
@@ -80,7 +78,7 @@ class TitanBot extends Client {
       await this.loadHandlers();
       startupLog('Handlers loaded');
       
-           startupLog('Logging into Discord...');
+      startupLog('Logging into Discord...');
       await this.login(this.config.bot.token);
       startupLog('Discord login successful');
 
@@ -99,7 +97,6 @@ class TitanBot extends Client {
         startupLog(`❌ Gabim i rëndë gjatë regjistrimit të detyruar: ${deployError}`);
       }
 
-      
       startupLog('Registering slash commands...');
       await this.registerCommands();
       startupLog('Slash commands registration complete');
@@ -180,7 +177,6 @@ class TitanBot extends Client {
       };
       res.status(200).json(status);
     });
-
     app.get('/ready', (req, res) => {
       const dbStatus = this.db?.getStatus?.() || { isDegraded: true };
       const isReady = this.isReady() && !dbStatus.isDegraded;
@@ -274,7 +270,6 @@ class TitanBot extends Client {
           }
         }
         
-        // Save cleaned counters if any were orphaned
         if (orphanedCounters.length > 0) {
           await saveServerCounters(this, guildId, validCounters);
           logger.info(`Cleaned up ${orphanedCounters.length} orphaned counter(s) from guild ${guildId} during scheduled update`);
@@ -330,12 +325,10 @@ class TitanBot extends Client {
     logger.info(`${'='.repeat(60)}`);
 
     try {
-      
       logger.info('Stopping cron jobs...');
       cron.getTasks().forEach(task => task.stop());
       logger.info('✅ Cron jobs stopped');
 
-      // Close database connection
       if (this.db && this.db.db) {
         logger.info('Closing database connection...');
         try {
@@ -348,21 +341,18 @@ class TitanBot extends Client {
         }
       }
 
-      
       logger.info('Destroying Discord client...');
       if (this.isReady()) {
         try {
           this.destroy();
           logger.info('✅ Discord client destroyed');
         } catch (error) {
-          
-          
           logger.warn('Discord client destroy warning (non-critical):', error.message);
         }
       }
 
       logger.info('✅ Graceful shutdown complete');
-  shutdownLog('Bot stopped successfully.');
+      shutdownLog('Bot stopped successfully.');
       process.exit(0);
     } catch (error) {
       logger.error('Error during graceful shutdown:', error);
@@ -397,6 +387,3 @@ try {
 }
 
 export default TitanBot;
-
-
-
