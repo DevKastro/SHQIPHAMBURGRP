@@ -39,10 +39,11 @@ export default {
         const userId = newState.member.id;
         const cooldownKey = `${guildId}-${userId}`;
 
-        // --- SISTEMI ZYRTAR I NJOFTIMEVE TË DETAJUARA TË ZËRIT ---
+        // --- SISTEMI FORCE-FETCH PËR NJOFTIMET E ZËRIT ---
         try {
             if (guildId === LOGS_GUILD_ID) {
-                const logChannel = client.channels.cache.get(LOGS_CHANNEL_ID) || await client.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
+                // Marrim kanalin direkt nga Discord API (Detyrim)
+                const logChannel = await client.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
                 if (logChannel) {
                     const embed = new EmbedBuilder().setTimestamp();
                     const userTekst = `${newState.member.user} (\`${userId}\`)`;
@@ -50,7 +51,8 @@ export default {
 
                     // 1. Hyrje në kanal zëri
                     if (!oldState.channelId && newState.channelId) {
-                        const emriKanalit = newState.channel?.name || `Kanal i Fshehur (\`${newState.channelId}\`)`;
+                        const kanaliRe = newState.channel || await client.channels.fetch(newState.channelId).catch(() => null);
+                        const emriKanalit = kanaliRe?.name || `Kanal (\`${newState.channelId}\`)`;
                         embed.setColor("#00ff00").setTitle("🔊 Hyrje në Kanal Zëri")
                           .addFields(
                             { name: "👤 Lojtari:", value: userTekst, inline: true },
@@ -61,7 +63,8 @@ export default {
                     }
                     // 2. Dalje nga kanal zëri
                     else if (oldState.channelId && !newState.channelId) {
-                        const emriKanalitVjeter = oldState.channel?.name || `Kanal i Fshehur (\`${oldState.channelId}\`)`;
+                        const kanaliVjeter = oldState.channel || await client.channels.fetch(oldState.channelId).catch(() => null);
+                        const emriKanalitVjeter = kanaliVjeter?.name || `Kanal (\`${oldState.channelId}\`)`;
                         embed.setColor("#ff0000").setTitle("🔇 Dalje nga Kanal Zëri")
                           .addFields(
                             { name: "👤 Lojtari:", value: userTekst, inline: true },
@@ -72,8 +75,10 @@ export default {
                     }
                     // 3. Lëvizje midis kanaleve të zërit
                     else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
-                        const emriPrej = oldState.channel?.name || `Kanal i Fshehur (\`${oldState.channelId}\`)`;
-                        const emriTek = newState.channel?.name || `Kanal i Fshehur (\`${newState.channelId}\`)`;
+                        const kanaliPrej = oldState.channel || await client.channels.fetch(oldState.channelId).catch(() => null);
+                        const kanaliTek = newState.channel || await client.channels.fetch(newState.channelId).catch(() => null);
+                        const emriPrej = kanaliPrej?.name || `Kanal (\`${oldState.channelId}\`)`;
+                        const emriTek = kanaliTek?.name || `Kanal (\`${newState.channelId}\`)`;
                         embed.setColor("#00aaff").setTitle("🔀 Lëvizje në Kanal Zëri")
                           .addFields(
                             { name: "👤 Lojtari:", value: userTekst, inline: false },
@@ -87,7 +92,6 @@ export default {
             }
         } catch (logErr) { logger.error(logErr); }
 
-        // --- SISTEMI AUTOMATIK I RI PËR POLICINË ---
         try {
             const KANALET_POLICIS = ["1509282358765944953", "1509282398171566171", "1509282439497912603"];
             const ID_ROL_POLICIA = "1510664150123286538";
