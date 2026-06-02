@@ -10,9 +10,17 @@ if (!global.policeDutyStart) global.policeDutyStart = new Map();
 if (!global.policeBackupTime) global.policeBackupTime = new Map();
 if (!global.policeDisconnectTimers) global.policeDisconnectTimers = new Map();
 
-// Konfigurimet për njoftimet (Logs) e kanalit të zërit
 const LOGS_GUILD_ID = "1375191211199168553";
 const LOGS_CHANNEL_ID = "1511444716925882539";
+
+const channelCreationCooldown = new Map();
+const VOICE_CREATE_COOLDOWN_MS = 2000;
+const DEFAULT_VOICE_BITRATE = 64000;
+const MAX_VOICE_BITRATE = 384000;
+const MIN_VOICE_BITRATE = 8000;
+const MAX_CHANNEL_NAME_LENGTH = 100;
+const FALLBACK_CHANNEL_NAME = 'Voice Room';
+const MAX_TRACKED_COOLDOWNS = 10000;
 
 function marrKohenLog() {
   const tani = new Date();
@@ -31,42 +39,46 @@ export default {
         const userId = newState.member.id;
         const cooldownKey = `${guildId}-${userId}`;
 
-        // --- SISTEMI ZYRTAR I NJOFTIMEVE (LOGS) TË ZËRIT ---
+        // --- SISTEMI ZYRTAR I NJOFTIMEVE TË DETAJUARA TË ZËRIT ---
         try {
             if (guildId === LOGS_GUILD_ID) {
-                const logChannel = newState.guild.channels.cache.get(LOGS_CHANNEL_ID);
+                const logChannel = client.channels.cache.get(LOGS_CHANNEL_ID) || await client.channels.fetch(LOGS_CHANNEL_ID).catch(() => null);
                 if (logChannel) {
                     const embed = new EmbedBuilder().setTimestamp();
                     const userTekst = `${newState.member.user} (\`${userId}\`)`;
                     const kohaTekst = `\`${marrKohenLog()}\``;
 
-                    // Hyrje në kanal zëri
+                    // 1. Hyrje në kanal zëri
                     if (!oldState.channelId && newState.channelId) {
+                        const emriKanalit = newState.channel?.name || `Kanal i Fshehur (\`${newState.channelId}\`)`;
                         embed.setColor("#00ff00").setTitle("🔊 Hyrje në Kanal Zëri")
                           .addFields(
                             { name: "👤 Lojtari:", value: userTekst, inline: true },
-                            { name: "📞 Kanal i Ri:", value: `${newState.channel}`, inline: true },
+                            { name: "📞 Kanali ku hyri:", value: `**${emriKanalit}**`, inline: true },
                             { name: "⏰ Koha:", value: kohaTekst, inline: false }
                           );
                         await logChannel.send({ embeds: [embed] }).catch(() => null);
                     }
-                    // Dalje nga kanal zëri
+                    // 2. Dalje nga kanal zëri
                     else if (oldState.channelId && !newState.channelId) {
+                        const emriKanalitVjeter = oldState.channel?.name || `Kanal i Fshehur (\`${oldState.channelId}\`)`;
                         embed.setColor("#ff0000").setTitle("🔇 Dalje nga Kanal Zëri")
                           .addFields(
                             { name: "👤 Lojtari:", value: userTekst, inline: true },
-                            { name: "📞 Kanali i Vjetër:", value: `${oldState.channel}`, inline: true },
+                            { name: "📞 Kanali nga doli:", value: `**${emriKanalitVjeter}**`, inline: true },
                             { name: "⏰ Koha:", value: kohaTekst, inline: false }
                           );
                         await logChannel.send({ embeds: [embed] }).catch(() => null);
                     }
-                    // Lëvizje midis kanaleve të zërit
+                    // 3. Lëvizje midis kanaleve të zërit
                     else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+                        const emriPrej = oldState.channel?.name || `Kanal i Fshehur (\`${oldState.channelId}\`)`;
+                        const emriTek = newState.channel?.name || `Kanal i Fshehur (\`${newState.channelId}\`)`;
                         embed.setColor("#00aaff").setTitle("🔀 Lëvizje në Kanal Zëri")
                           .addFields(
                             { name: "👤 Lojtari:", value: userTekst, inline: false },
-                            { name: "📞 Prej Kanalit:", value: `${oldState.channel}`, inline: true },
-                            { name: "📞 Tek Kanali:", value: `${newState.channel}`, inline: true },
+                            { name: "📞 Prej Kanalit:", value: `**${emriPrej}**`, inline: true },
+                            { name: "📞 Tek Kanali:", value: `**${emriTek}**`, inline: true },
                             { name: "⏰ Koha:", value: kohaTekst, inline: false }
                           );
                         await logChannel.send({ embeds: [embed] }).catch(() => null);
@@ -210,7 +222,10 @@ export default {
 
             if (member.voice.channel?.id !== channel.id) return;
             channelCreationCooldown.set(cooldownKey, now);
-            cleanupCooldownEntries();
+            if (channelCreationCooldown.size > MAX_TRACKED_COOLDOWNS) {
+                const firstKey = channelCreationCooldown.keys().next().value;
+                if (firstKey) channelCreationCooldown.delete(firstKey);
+            }
             await createTemporaryChannel(client, state, config);
         }
 
