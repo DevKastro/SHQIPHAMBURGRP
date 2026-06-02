@@ -13,6 +13,11 @@ if (!global.staffDutyStart) global.staffDutyStart = new Map();
 if (!global.staffBackupTime) global.staffBackupTime = new Map();
 if (!global.disconnectTimers) global.disconnectTimers = new Map();
 
+// --- MEMORIA E RE PËR POLICINË ---
+if (!global.policeDutyStart) global.policeDutyStart = new Map();
+if (!global.policeBackupTime) global.policeBackupTime = new Map();
+if (!global.policeDisconnectTimers) global.policeDisconnectTimers = new Map();
+
 const channelCreationCooldown = new Map();
 const VOICE_CREATE_COOLDOWN_MS = 2000;
 const DEFAULT_VOICE_BITRATE = 64000;
@@ -32,7 +37,67 @@ export default {
         const cooldownKey = `${guildId}-${userId}`;
         cleanupCooldownEntries();
 
-        // --- SISTEMI AUTOMATIK I STAFF DUTY + DISCONNECT 10 SEKRENDA ---
+        // ------------------------------------------------------------------
+        // 🚨 SISTEMI AUTOMATIK I RI PËR POLICINË (DISCONNECT 20 MINUTA)
+        // ------------------------------------------------------------------
+        try {
+            const KANALET_POLICIS = ["1509282358765944953", "1509282398171566171", "1509282439497912603"];
+            const ID_ROL_POLICIA = "1510664150123286538";
+
+            const eshtePolice = newState.member?.roles.cache.has(ID_ROL_POLICIA) || oldState.member?.roles.cache.has(ID_ROL_POLICIA);
+
+            if (eshtePolice) {
+                // 1. Kur polici futet në një nga 3 kanalet
+                if (KANALET_POLICIS.includes(newState.channelId) && !KANALET_POLICIS.includes(oldState.channelId)) {
+                    global.policeDutyStart.set(userId, Math.floor(Date.now() / 1000));
+
+                    if (global.policeDisconnectTimers.has(userId)) clearTimeout(global.policeDisconnectTimers.get(userId));
+
+                    const pTimer = setTimeout(async () => {
+                        try {
+                            const memberAktual = newState.guild.members.cache.get(userId);
+                            if (memberAktual && KANALET_POLICIS.includes(memberAktual.voice.channelId)) {
+                                await memberAktual.voice.setChannel(null).catch(() => null);
+                            }
+                        } catch (err) { }
+                    }, 1200000); // 20 minuta
+
+                    global.policeDisconnectTimers.set(userId, pTimer);
+                }
+
+                // 2. Kur polici del ose bëhet disconnect nga boti
+                if (KANALET_POLICIS.includes(oldState.channelId) && !KANALET_POLICIS.includes(newState.channelId)) {
+                    if (global.policeDisconnectTimers.has(userId)) {
+                        clearTimeout(global.policeDisconnectTimers.get(userId));
+                        global.policeDisconnectTimers.delete(userId);
+                    }
+
+                    const kohaStart = global.policeDutyStart.get(userId);
+                    if (kohaStart) {
+                        const sekondatKaluar = Math.floor(Date.now() / 1000) - kohaStart;
+
+                        if (sekondatKaluar > 0) {
+                            const dbQuery = client.db?.query || (client.db?.db?.query ? client.db.db.query : null);
+                            if (dbQuery) {
+                                await dbQuery(`CREATE TABLE IF NOT EXISTS police_duty (user_id TEXT PRIMARY KEY, total_time BIGINT)`).catch(() => null);
+                                await dbQuery(
+                                    `INSERT INTO police_duty (user_id, total_time) VALUES ($1, $2) 
+                                     ON CONFLICT (user_id) DO UPDATE SET total_time = police_duty.total_time + $2`,
+                                    [userId, sekondatKaluar]
+                                ).catch(() => null);
+                            }
+                            const kohaAktuale = global.policeBackupTime.get(userId) || 0;
+                            global.policeBackupTime.set(userId, kohaAktuale + sekondatKaluar);
+                        }
+                        global.policeDutyStart.delete(userId);
+                    }
+                }
+            }
+        } catch (err) { logger.error(err); }
+
+        // ------------------------------------------------------------------
+        // 👥 SISTEMI KRYESOR I STAFF DUTY (QË FUNKSIONONTE MË PARË)
+        // ------------------------------------------------------------------
         try {
             const ID_KANALI_ZE_SPECIFIK = "1500903502501773373";
             const ID_ROL_STAFF_KRYESOR = "1435751640346132570";
@@ -54,7 +119,7 @@ export default {
                                 await memberAktual.voice.setChannel(null).catch(() => null);
                             }
                         } catch (err) { }
-                    }, 1200000);
+                    }, 1200000); // 20 minuta
 
                     global.disconnectTimers.set(userId, timer);
                 }
@@ -82,7 +147,6 @@ export default {
                                     [userId, sekondatKaluar]
                                 ).catch(() => null);
                             }
-                            
                             const kohaAktuale = global.staffBackupTime.get(userId) || 0;
                             global.staffBackupTime.set(userId, kohaAktuale + sekondatKaluar);
                         }
@@ -90,20 +154,15 @@ export default {
                     }
                 }
             }
-        } catch (staffError) { 
-            logger.error(staffError); 
-        }
+        } catch (staffError) { logger.error(staffError); }
 
         try {
             const config = await getJoinToCreateConfig(client, guildId);
             if (!config.enabled || config.triggerChannels.length === 0) return;
-            
             if (!oldState.channel && newState.channel) await handleVoiceJoin(client, newState, config);
             if (oldState.channel && !newState.channel) await handleVoiceLeave(client, oldState, config);
             if (oldState.channel && newState.channel && oldState.channel.id !== newState.channel.id) await handleVoiceMove(client, oldState, newState, config);
-        } catch (error) { 
-            logger.error(error); 
-        }
+        } catch (error) { logger.error(error); }
         async function handleVoiceJoin(client, state, config) {
             const { channel, member } = state;
             if (!config.triggerChannels.includes(channel.id)) return;
