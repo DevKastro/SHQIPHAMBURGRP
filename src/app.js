@@ -65,20 +65,19 @@ class TitanBot extends Client {
       await this.login(this.config.bot.token);
       startupLog('Discord login successful');
 
-      // Regjistrimi i komandave në serverat specifikë
+      // Regjistrimi i komandave GLOBALISHT (Për të gjithë serverat)
       try {
-        const serveratEmi = ["1505536422013304852", "1496144652938772500"];
+        startupLog('Po regjistroj komandat globalisht për të gjithë serverat...');
         const commandsData = Array.from(this.commands.values()).map(cmd => cmd.data.toJSON());
 
-        for (const guildId of serveratEmi) {
-          await this.rest.put(
-            `/applications/${this.user.id}/guilds/${guildId}/commands`,
-            { body: commandsData }
-          );
-          startupLog(`[DETYRIM]: ✅ Komandat u regjistruan në serverin: ${guildId}`);
-        }
+        // Ky rresht i dërgon komandat në çdo server ku ndodhet boti
+        await this.rest.put(
+          `/applications/${this.user.id}/commands`,
+          { body: commandsData }
+        );
+        startupLog('✅ Komandat u regjistruan globalisht me sukses!');
       } catch (deployError) {
-        startupLog(`❌ Gabim gjatë regjistrimit të komandave: ${deployError}`);
+        startupLog(`❌ Gabim gjatë regjistrimit global të komandave: ${deployError}`);
       }
 
       startupLog('ONLINE ✅ | Boti është gati.');
